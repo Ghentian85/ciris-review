@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Inter", "Helvetica Neue", Arial, sans-serif;
+    --radius: 8px;
+
+    /* Luxury minimal palette — off-white, ink, calm */
+    --bg: 44 14% 97%;          /* #FAFAF7 */
+    --surface: 0 0% 100%;
+    --ink: 0 0% 7%;            /* #111 */
+    --muted: 30 6% 45%;        /* #74716C */
+    --line: 36 14% 89%;        /* #EAE8E2 */
+    --accent: 0 0% 12%;
+    --ring: 0 0% 60%;
+
+    /* Statuses — calm tones, no aggressive red */
+    --status-pending: 30 6% 45%;        /* grey */
+    --status-approved: 150 22% 38%;     /* sage */
+    --status-notes: 38 60% 50%;         /* amber */
+    --status-revision: 18 55% 50%;      /* terracotta */
+    --status-v2: 215 30% 45%;           /* slate blue */
+    --status-final: 150 35% 28%;        /* deep sage */
+  }
+
+  html, body {
+    background-color: hsl(var(--bg));
+    color: hsl(var(--ink));
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: hsl(var(--ink));
+    color: hsl(var(--bg));
+  }
+}
+
+@layer components {
+  .surface {
+    background: hsl(var(--surface));
+    border: 1px solid hsl(var(--line));
+    border-radius: var(--radius);
+  }
+  .hairline {
+    border-color: hsl(var(--line));
+  }
+}
