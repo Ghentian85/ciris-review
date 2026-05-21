@@ -333,6 +333,33 @@ export function Reviewer(props: Props) {
     if (activeCommentId === commentId) setActiveCommentId(null);
   }
 
+  // Post-prod / admin / internal_reviewer can mark feedback "done" once
+  // they've addressed it. Optimistic flip; rolls back on API failure.
+  async function toggleResolved(commentId: string, next: boolean) {
+    setComments((cur) =>
+      cur.map((c) =>
+        c.id === commentId
+          ? { ...c, resolvedAt: next ? new Date().toISOString() : null }
+          : c
+      )
+    );
+    const res = await fetch(`/api/comments/${commentId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resolved: next }),
+    });
+    if (!res.ok) {
+      // Rollback
+      setComments((cur) =>
+        cur.map((c) =>
+          c.id === commentId
+            ? { ...c, resolvedAt: next ? null : new Date().toISOString() }
+            : c
+        )
+      );
+    }
+  }
+
   async function replyToComment(parentId: string, body: string) {
     const res = await fetch(`/api/images/${image.id}/comments`, {
       method: "POST",
@@ -643,9 +670,12 @@ export function Reviewer(props: Props) {
   ) : null;
 
   const statusActions = canChangeStatus ? (
-    <div className="space-y-2">
-      <p className="text-xs uppercase tracking-wide text-muted">Decision</p>
-      <div className="inline-flex w-full p-1 rounded-md bg-line/40 gap-1">
+    <div className="space-y-3">
+      <p className="text-[10px] uppercase tracking-[0.18em] text-muted flex items-center gap-2">
+        <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+        Decision
+      </p>
+      <div className="grid grid-cols-2 gap-2">
         <DecisionPill
           tone="revision"
           active={isRevisionActive}
@@ -678,6 +708,10 @@ export function Reviewer(props: Props) {
     </div>
   ) : null;
 
+  // Anyone except the client can resolve. Resolving means "post-prod has
+  // addressed this in the next version" — workflow signal, not editing.
+  const canResolve = role !== "client_reviewer";
+
   const commentsList = (
     <div className="space-y-1.5">
       {comments.length === 0 && !pending ? (
@@ -687,34 +721,77 @@ export function Reviewer(props: Props) {
       ) : null}
       {comments.map((c, i) => {
         const isActive = activeCommentId === c.id;
+        const isResolved = !!c.resolvedAt;
         return (
-          <button
+          // div (not button) — we render a nested checkbox for resolve, and
+          // HTML forbids button-in-button. Hover-only interaction is fine
+          // without role="button" since the marker is the click target.
+          <div
             key={c.id}
-            type="button"
             onMouseEnter={() => setActiveCommentId(c.id)}
             onMouseLeave={() => setActiveCommentId((cur) => (cur === c.id ? null : cur))}
             className={cn(
-              "w-full text-left surface p-3 transition-colors block",
-              isActive ? "border-ink/40" : ""
+              "p-3 transition-colors block border border-l-[3px]",
+              // Resolved cards drop the surface look entirely — they sit on
+              // the page background dimmed, so the eye reads them as "filed
+              // away" rather than "active feedback".
+              isResolved
+                ? "border-line-soft border-l-line-soft bg-bg/60 text-muted-soft"
+                : "surface",
+              !isResolved && isActive
+                ? "border-l-accent border-accent/20 bg-accent-soft/60"
+                : !isResolved
+                  ? "border-l-transparent"
+                  : ""
             )}
           >
             <div className="flex items-start gap-2">
-              <span className="mt-0.5 h-5 min-w-5 px-1 rounded-full bg-ink text-bg text-[10px] font-semibold inline-flex items-center justify-center">
+              <span
+                className={cn(
+                  "mt-0.5 h-5 min-w-5 px-1 text-[10px] font-semibold inline-flex items-center justify-center",
+                  isResolved
+                    ? "bg-line text-muted-soft"
+                    : "bg-ink text-bg"
+                )}
+              >
                 {i + 1}
               </span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm leading-snug">{c.body}</p>
-                <p className="text-[10px] text-muted mt-1 flex items-center gap-2">
+                <p
+                  className={cn(
+                    "text-sm leading-snug",
+                    isResolved && "line-through decoration-1 decoration-muted-soft text-muted"
+                  )}
+                >
+                  {c.body}
+                </p>
+                <p
+                  className={cn(
+                    "text-[10px] mt-1 flex items-center gap-2",
+                    isResolved ? "text-muted-soft" : "text-muted"
+                  )}
+                >
                   <span>{c.author.name ?? c.author.email}</span>
                   {c.visibility === "internal" ? (
-                    <span className="px-1 py-0.5 rounded bg-line/60 text-[9px] uppercase tracking-wide">
+                    <span className="px-1 py-0.5 bg-line/60 text-[9px] uppercase tracking-wide">
                       internal
+                    </span>
+                  ) : null}
+                  {isResolved ? (
+                    <span className="px-1 py-0.5 bg-status-approved-soft text-status-approved text-[9px] uppercase tracking-wide font-medium">
+                      done
                     </span>
                   ) : null}
                 </p>
               </div>
+              {canResolve ? (
+                <ResolveToggle
+                  resolved={isResolved}
+                  onChange={(next) => toggleResolved(c.id, next)}
+                />
+              ) : null}
             </div>
-          </button>
+          </div>
         );
       })}
     </div>
@@ -960,71 +1037,63 @@ export function Reviewer(props: Props) {
           </div>
 
           {/* Right rail */}
-          <aside className="w-[360px] flex-shrink-0 bg-bg border-l hairline flex flex-col">
-            <div className="p-4 border-b hairline">
+          <aside className="w-[380px] flex-shrink-0 bg-bg border-l hairline flex flex-col">
+            <div className="p-5 border-b hairline">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-[10px] uppercase tracking-wide text-muted">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-muted flex items-center gap-2 mb-2">
+                    <span className="h-1.5 w-1.5 rounded-full bg-accent" />
                     {image.subjectKey ?? "Image"}
                   </p>
-                  <h1 className="text-base font-medium tracking-tight truncate">
+                  <h1 className="font-display text-xl font-medium tracking-tight leading-tight truncate">
                     {image.displayName ?? image.slotName}
                   </h1>
                 </div>
                 <button
                   type="button"
                   onClick={exitFullscreen}
-                  className="inline-flex h-7 px-2 items-center rounded-md text-[11px] border border-line hover:border-ink/30 transition-colors flex-shrink-0"
+                  className="press inline-flex h-8 px-3 items-center text-[11px] border border-line hover:border-ink/30 transition-colors flex-shrink-0"
                   title="Exit fullscreen (Esc)"
                 >
                   Exit ⛶
                 </button>
               </div>
-              <div className="mt-3 flex items-center justify-between">
-                <StatusChip status={image.status as ImageStatus} />
-                <span className="text-[11px] text-muted">
+              <div className="mt-4 flex items-center justify-between">
+                <StatusChip status={image.status as ImageStatus} size="sm" />
+                <span className="text-[11px] text-muted tabular-nums">
                   V{image.versionNumber} · {image.width}×{image.height}
                 </span>
               </div>
             </div>
 
             {versionSwitcher ? (
-              <div className="p-4 border-b hairline">
-                <p className="text-[10px] uppercase tracking-wide text-muted mb-2">Versions</p>
+              <div className="p-5 border-b hairline">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-muted mb-3">
+                  Versions
+                </p>
                 {versionSwitcher}
               </div>
             ) : null}
 
             {viewTabs ? (
-              <div className="p-4 border-b hairline">
-                <p className="text-[10px] uppercase tracking-wide text-muted mb-2">Views</p>
+              <div className="p-5 border-b hairline">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-muted mb-3">
+                  Views
+                </p>
                 {viewTabs}
               </div>
             ) : null}
 
-            {historyBanner ? <div className="px-4 pt-3">{historyBanner}</div> : null}
+            {historyBanner ? <div className="px-5 pt-4">{historyBanner}</div> : null}
 
-            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
-              <p className="text-[10px] uppercase tracking-wide text-muted">
-                Comments ({comments.length})
-              </p>
+            <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-3">
+              <CommentsHeader comments={comments} />
               {commentsList}
             </div>
 
-            <div className="p-4 border-t hairline space-y-3">
+            <div className="p-5 border-t hairline space-y-4">
               {statusActions}
-              <div className="text-[10px] text-muted">
-                <kbd className="px-1 py-0.5 rounded border border-line">←</kbd>{" "}
-                <kbd className="px-1 py-0.5 rounded border border-line">→</kbd> nav ·{" "}
-                <kbd className="px-1 py-0.5 rounded border border-line">V</kbd>{" "}
-                <kbd className="px-1 py-0.5 rounded border border-line">P</kbd>{" "}
-                <kbd className="px-1 py-0.5 rounded border border-line">R</kbd>{" "}
-                <kbd className="px-1 py-0.5 rounded border border-line">D</kbd> tools ·{" "}
-                <kbd className="px-1 py-0.5 rounded border border-line">F</kbd> fullscreen ·{" "}
-                <kbd className="px-1 py-0.5 rounded border border-line">+</kbd>{" "}
-                <kbd className="px-1 py-0.5 rounded border border-line">−</kbd>{" "}
-                <kbd className="px-1 py-0.5 rounded border border-line">0</kbd> zoom
-              </div>
+              <ShortcutLegend />
             </div>
           </aside>
         </>
@@ -1066,36 +1135,37 @@ export function Reviewer(props: Props) {
               </div>
             </section>
 
-            <aside className="space-y-5">
+            <aside className="space-y-6">
               <div>
-                <p className="text-xs uppercase tracking-wide text-muted mb-1">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-muted flex items-center gap-2 mb-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-accent" />
                   {image.subjectKey ?? "Image"}
                 </p>
-                <h1 className="text-lg font-medium tracking-tight">
+                <h1 className="font-display text-2xl font-medium tracking-tight leading-tight">
                   {image.displayName ?? image.slotName}
                 </h1>
-                <p className="text-xs text-muted mt-1 truncate" title={image.filenameOriginal}>
+                <p className="text-xs text-muted-soft mt-1.5 truncate" title={image.filenameOriginal}>
                   {image.filenameOriginal}
                 </p>
               </div>
 
               <div className="flex items-center justify-between">
-                <StatusChip status={image.status as ImageStatus} />
-                <span className="text-xs text-muted">
+                <StatusChip status={image.status as ImageStatus} size="sm" />
+                <span className="text-xs text-muted tabular-nums">
                   V{image.versionNumber} · {image.width}×{image.height}
                 </span>
               </div>
 
               {versionSwitcher ? (
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-muted mb-2">Versions</p>
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-muted mb-3">Versions</p>
                   {versionSwitcher}
                 </div>
               ) : null}
 
               {viewTabs ? (
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-muted mb-2">Views</p>
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-muted mb-3">Views</p>
                   {viewTabs}
                 </div>
               ) : null}
@@ -1105,29 +1175,117 @@ export function Reviewer(props: Props) {
               {statusActions}
 
               <div>
-                <p className="text-xs uppercase tracking-wide text-muted mb-2">
-                  Comments ({comments.length})
-                </p>
+                <CommentsHeader comments={comments} className="mb-3" />
                 {commentsList}
               </div>
 
-              <div className="text-[11px] text-muted">
-                <kbd className="px-1 py-0.5 rounded border border-line">←</kbd>{" "}
-                <kbd className="px-1 py-0.5 rounded border border-line">→</kbd> nav ·{" "}
-                <kbd className="px-1 py-0.5 rounded border border-line">V</kbd>{" "}
-                <kbd className="px-1 py-0.5 rounded border border-line">P</kbd>{" "}
-                <kbd className="px-1 py-0.5 rounded border border-line">R</kbd>{" "}
-                <kbd className="px-1 py-0.5 rounded border border-line">D</kbd> tools ·{" "}
-                <kbd className="px-1 py-0.5 rounded border border-line">F</kbd> fullscreen ·{" "}
-                <kbd className="px-1 py-0.5 rounded border border-line">+</kbd>{" "}
-                <kbd className="px-1 py-0.5 rounded border border-line">−</kbd>{" "}
-                <kbd className="px-1 py-0.5 rounded border border-line">0</kbd> zoom
-              </div>
+              <ShortcutLegend />
             </aside>
           </div>
         </main>
       )}
     </>
+  );
+}
+
+// Section header: "Comments (N)" with an inline "X done" count once any
+// comment has been resolved. Keeps the header quiet when there's nothing
+// to communicate beyond the total.
+function CommentsHeader({
+  comments,
+  className,
+}: {
+  comments: Comment[];
+  className?: string;
+}) {
+  const done = comments.filter((c) => c.resolvedAt).length;
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-muted",
+        className
+      )}
+    >
+      <span>Comments ({comments.length})</span>
+      {done > 0 ? (
+        <span className="inline-flex items-center gap-1.5 text-status-approved normal-case tracking-normal">
+          <span className="h-1.5 w-1.5 rounded-full bg-status-approved" />
+          {done} done
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+// Square checkbox-style "Done" toggle for comments. Post-prod / admin uses
+// this to mark feedback addressed in the next version. Clicking does NOT
+// expand the comment or move the active highlight — it's a workflow signal.
+function ResolveToggle({
+  resolved,
+  onChange,
+}: {
+  resolved: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onChange(!resolved);
+      }}
+      onMouseEnter={(e) => e.stopPropagation()}
+      aria-pressed={resolved}
+      title={resolved ? "Mark as not done" : "Mark as done"}
+      className={cn(
+        "h-6 w-6 border inline-flex items-center justify-center flex-shrink-0 transition-colors press",
+        resolved
+          ? "bg-status-approved border-status-approved text-white"
+          : "bg-surface border-line text-muted hover:border-status-approved/60 hover:text-status-approved"
+      )}
+    >
+      {resolved ? (
+        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 8.5l3.5 3.5L13 5" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 16 16" className="h-3 w-3 opacity-50" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+          <path d="M3 8.5l3.5 3.5L13 5" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
+// Compact two-row legend of keyboard shortcuts. Square mono-style chips
+// match the rest of the sharp UI; one row per category so users can scan.
+function ShortcutLegend() {
+  const groups: { label: string; keys: string[] }[] = [
+    { label: "Navigate", keys: ["←", "→"] },
+    { label: "Tools", keys: ["V", "P", "R", "D"] },
+    { label: "Zoom", keys: ["+", "−", "0"] },
+    { label: "Fullscreen", keys: ["F"] },
+  ];
+  return (
+    <div className="space-y-1.5">
+      {groups.map((g) => (
+        <div key={g.label} className="flex items-center gap-2 text-[10px]">
+          <span className="text-muted-soft w-[68px] uppercase tracking-[0.15em]">
+            {g.label}
+          </span>
+          <div className="flex items-center gap-1">
+            {g.keys.map((k) => (
+              <kbd
+                key={k}
+                className="px-1.5 h-5 min-w-5 inline-flex items-center justify-center border border-line text-[10px] font-medium tabular-nums text-muted bg-surface"
+              >
+                {k}
+              </kbd>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -1148,9 +1306,9 @@ function DecisionPill({
 }) {
   const activeBg =
     tone === "approved"
-      ? "bg-status-approved text-white shadow-[0_1px_3px_rgba(0,0,0,0.2)]"
-      : "bg-status-notes text-white shadow-[0_1px_3px_rgba(0,0,0,0.2)]";
-  const inactiveBg = "text-ink hover:bg-surface/70";
+      ? "bg-status-approved text-white border-status-approved"
+      : "bg-status-notes text-white border-status-notes";
+  const inactiveBg = "border-line bg-surface text-ink hover:border-ink/30";
   return (
     <button
       type="button"
@@ -1158,9 +1316,8 @@ function DecisionPill({
       disabled={disabled}
       aria-pressed={active}
       className={cn(
-        "flex-1 h-9 px-3 rounded-md text-sm font-medium transition-all duration-150",
+        "press h-10 px-3 text-sm font-medium border transition-colors",
         "inline-flex items-center justify-center gap-2",
-        "active:scale-[0.97]",
         "disabled:opacity-50 disabled:pointer-events-none",
         active ? activeBg : inactiveBg
       )}

@@ -142,14 +142,16 @@ export function AnnotationMarker({
               className={cn(
                 "z-10 outline-none transition-all duration-150 select-none",
                 "h-7 w-7 rounded-full inline-flex items-center justify-center text-[11px] font-semibold",
-                "ring-2 ring-bg/95 shadow-[0_2px_8px_rgba(0,0,0,0.35)]",
-                "bg-ink text-bg",
                 // Explicit pointer-events:auto: the wrapper around us is
                 // pointer-events:none so empty-area clicks reach the SVG, but
                 // the button itself MUST be clickable. Browsers don't honor
                 // the inherited "auto" default when an ancestor is "none".
                 "pointer-events-auto",
-                isActive ? "scale-110" : "hover:scale-110 focus-visible:scale-110"
+                isActive
+                  ? // Active: coral accent ring, bigger glow, scaled up — same
+                    // visual link the rail comment row gets when hovered.
+                    "bg-accent text-white ring-[3px] ring-accent/35 shadow-[0_4px_18px_rgba(238,122,78,0.55)] scale-[1.18]"
+                  : "bg-ink text-bg ring-2 ring-bg/95 shadow-[0_2px_8px_rgba(0,0,0,0.35)] hover:scale-110 focus-visible:scale-110"
               )}
             >
               {number}
@@ -167,7 +169,7 @@ export function AnnotationMarker({
               className="z-50 max-w-[280px] surface px-3 py-2.5 bg-surface/98 backdrop-blur animate-fade-in pointer-events-none"
             >
               <div className="flex items-start gap-2">
-                <span className="mt-0.5 h-5 min-w-5 px-1 rounded-full bg-ink text-bg text-[10px] font-semibold inline-flex items-center justify-center flex-shrink-0">
+                <span className="mt-0.5 h-5 min-w-5 px-1 bg-ink text-bg text-[10px] font-semibold inline-flex items-center justify-center flex-shrink-0">
                   {number}
                 </span>
                 <div className="min-w-0">
@@ -175,7 +177,7 @@ export function AnnotationMarker({
                   <p className="text-[10px] text-muted mt-1.5 flex items-center gap-1.5">
                     <span>{comment.author.name ?? comment.author.email}</span>
                     {comment.visibility === "internal" ? (
-                      <span className="px-1 py-0.5 rounded bg-line/70 text-[9px] uppercase tracking-wide">
+                      <span className="px-1 py-0.5 bg-line/70 text-[9px] uppercase tracking-wide">
                         internal
                       </span>
                     ) : null}
@@ -199,7 +201,7 @@ export function AnnotationMarker({
               onOpenAutoFocus={(e) => e.preventDefault()}
             >
               <div className="flex items-start gap-2 mb-3">
-                <span className="mt-0.5 h-5 min-w-5 px-1 rounded-full bg-ink text-bg text-[10px] font-semibold inline-flex items-center justify-center flex-shrink-0">
+                <span className="mt-0.5 h-5 min-w-5 px-1 bg-ink text-bg text-[10px] font-semibold inline-flex items-center justify-center flex-shrink-0">
                   {number}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -223,7 +225,7 @@ export function AnnotationMarker({
                   <p className="text-[10px] text-muted mt-1.5 flex items-center gap-1.5">
                     <span>{comment.author.name ?? comment.author.email}</span>
                     {comment.visibility === "internal" ? (
-                      <span className="px-1 py-0.5 rounded bg-line/70 text-[9px] uppercase tracking-wide">
+                      <span className="px-1 py-0.5 bg-line/70 text-[9px] uppercase tracking-wide">
                         internal
                       </span>
                     ) : null}

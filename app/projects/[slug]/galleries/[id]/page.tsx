@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Topbar } from "@/components/app/topbar";
 import { StatusChip, type ImageStatus } from "@/components/ui/status-chip";
 import { Button } from "@/components/ui/button";
-import { getCurrentUser, isOrgAdmin } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 type ImgRow = {
@@ -87,9 +86,7 @@ export default async function GalleryPage({
   const baseHref = `/projects/${project.slug}/galleries/${gallery.id}/images`;
 
   return (
-    <>
-      <Topbar userEmail={user.email} isAdmin={await isOrgAdmin(user.id)} />
-      <main className="mx-auto max-w-7xl px-6 py-10">
+    <main className="mx-auto max-w-7xl px-6 py-10">
         <div className="flex items-end justify-between mb-8">
           <div>
             <p className="text-xs uppercase tracking-wide text-muted">
@@ -154,23 +151,23 @@ export default async function GalleryPage({
                             />
                           ) : null}
                           {img.viewLabel ? (
-                            <div className="absolute top-2 left-2 text-[10px] font-medium tracking-wide bg-ink/80 text-bg rounded-sm px-1.5 py-0.5">
+                            <div className="absolute top-2 left-2 text-[10px] font-medium tracking-wide bg-ink/80 text-bg px-1.5 py-0.5">
                               {img.viewLabel}
                             </div>
                           ) : null}
-                          <div className="absolute top-2 right-2">
-                            <StatusChip status={img.status as ImageStatus} />
-                          </div>
                         </div>
                         <div className="p-3">
-                          <p
-                            className="text-xs truncate"
-                            title={img.filenameOriginal}
-                          >
-                            {img.displayName ?? img.slotName}
-                          </p>
+                          <div className="flex items-center justify-between gap-2">
+                            <p
+                              className="text-xs truncate flex-1 min-w-0"
+                              title={img.filenameOriginal}
+                            >
+                              {img.displayName ?? img.slotName}
+                            </p>
+                            <StatusChip status={img.status as ImageStatus} size="sm" />
+                          </div>
                           {img.currentVersion ? (
-                            <p className="text-[10px] text-muted mt-0.5">
+                            <p className="text-[10px] text-muted mt-1">
                               {img.currentVersion.width}×{img.currentVersion.height} · V
                               {img.currentVersion.versionNumber}
                             </p>
@@ -184,7 +181,6 @@ export default async function GalleryPage({
             ))}
           </div>
         )}
-      </main>
-    </>
+    </main>
   );
 }

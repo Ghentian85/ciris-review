@@ -60,7 +60,7 @@ export function StatusChip({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full font-medium tracking-tight shadow-[0_1px_3px_rgba(0,0,0,0.18)]",
+        "inline-flex items-center font-medium tracking-tight shadow-[0_1px_3px_rgba(0,0,0,0.18)]",
         TONE[v],
         SIZE[size],
         className

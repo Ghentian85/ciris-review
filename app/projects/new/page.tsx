@@ -5,7 +5,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Topbar } from "@/components/app/topbar";
 
 export default function NewProjectPage() {
   const router = useRouter();
@@ -38,9 +37,7 @@ export default function NewProjectPage() {
   }
 
   return (
-    <>
-      <Topbar />
-      <main className="mx-auto max-w-xl px-6 py-10">
+    <main className="mx-auto max-w-xl px-6 py-10">
         <h1 className="text-2xl font-medium tracking-tight mb-1">New project</h1>
         <p className="text-sm text-muted mb-8">
           Projects hold galleries, images, rounds and reviewers.
@@ -76,7 +73,6 @@ export default function NewProjectPage() {
             </Button>
           </div>
         </form>
-      </main>
-    </>
+    </main>
   );
 }

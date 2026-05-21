@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Topbar } from "@/components/app/topbar";
 import { Button } from "@/components/ui/button";
-import { getCurrentUser, isOrgAdmin } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
 import { SubmitRoundButton } from "./submit-round-button";
@@ -115,79 +114,77 @@ export default async function ProjectOverview({
   const baseQS = (t: TabKey) => `/projects/${project.slug}?tab=${t}`;
 
   return (
-    <>
-      <Topbar userEmail={user.email} isAdmin={await isOrgAdmin(user.id)} />
-      <main className="mx-auto max-w-7xl px-6 py-10">
-        <div className="flex items-end justify-between mb-8 flex-wrap gap-4">
+    <main className="mx-auto max-w-7xl px-6 pt-10 pb-16 animate-rise">
+        {/* ── Project hero (no card wrap; bare editorial block) ──────── */}
+        <section className="mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
           <div>
-            <p className="text-xs uppercase tracking-wide text-muted mb-2">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-muted mb-3 flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
               {project.client?.name ?? "Internal"}
             </p>
-            <h1 className="text-2xl font-medium tracking-tight">{project.name}</h1>
-            <p className="text-sm text-muted mt-1 flex items-center flex-wrap gap-x-2">
+            <h1 className="text-[34px] md:text-[44px] font-display font-medium tracking-tight leading-[1.05]">
+              {project.name}
+            </h1>
+            <p className="text-sm text-muted mt-3 flex items-center flex-wrap gap-x-2">
               <RoundIndicator round={currentRound} />
-              <span>·</span>
+              <span className="text-muted-soft">·</span>
               <span>Updated {formatDate(project.updatedAt)}</span>
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {!isClient ? (
-              <>
-                <SettingsDrawer
-                  project={{
-                    id: project.id,
-                    slug: project.slug,
-                    name: project.name,
-                    briefUrl: project.briefUrl,
-                    watermarkPreview: project.watermarkPreview,
-                    status: project.status,
-                  }}
-                  members={project.members.map((m) => ({
-                    id: m.id,
-                    role: m.role,
-                    user: {
-                      id: m.user.id,
-                      name: m.user.name,
-                      email: m.user.email,
-                    },
-                  }))}
-                  canArchive={isOrgAdminRole}
-                  canDelete={isOrgOwner}
+          {!isClient ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <SettingsDrawer
+                project={{
+                  id: project.id,
+                  slug: project.slug,
+                  name: project.name,
+                  briefUrl: project.briefUrl,
+                  watermarkPreview: project.watermarkPreview,
+                  status: project.status,
+                }}
+                members={project.members.map((m) => ({
+                  id: m.id,
+                  role: m.role,
+                  user: { id: m.user.id, name: m.user.name, email: m.user.email },
+                }))}
+                canArchive={isOrgAdminRole}
+                canDelete={isOrgOwner}
+              />
+              <Button asChild>
+                <Link href={`/projects/${project.slug}/upload`}>Upload images</Link>
+              </Button>
+              {draftReady > 0 && currentRound ? (
+                <NotifyClientButton
+                  projectId={project.id}
+                  roundNumber={currentRound.number}
+                  isFirstRound={isFirstRound}
                 />
-                <Button asChild>
-                  <Link href={`/projects/${project.slug}/upload`}>Upload images</Link>
-                </Button>
-                {draftReady > 0 && currentRound ? (
-                  <NotifyClientButton
-                    projectId={project.id}
-                    roundNumber={currentRound.number}
-                    isFirstRound={isFirstRound}
-                  />
-                ) : null}
-              </>
-            ) : null}
-          </div>
-        </div>
+              ) : null}
+            </div>
+          ) : null}
+        </section>
 
-        {/* ── Status tabs ──────────────────────────────────────────────── */}
-        <div className="border-b hairline mb-6 flex items-center gap-1">
-          <TabLink href={baseQS("pending")} active={tab === "pending"} count={counts.pending}>
+        {/* ── Status tabs (square, underline-on-active) ──────────────── */}
+        <div className="border-b hairline mb-8 flex items-center">
+          <TabPill href={baseQS("pending")} active={tab === "pending"} count={counts.pending}>
             Still to review
-          </TabLink>
-          <TabLink href={baseQS("approved")} active={tab === "approved"} count={counts.approved}>
+          </TabPill>
+          <TabPill href={baseQS("approved")} active={tab === "approved"} count={counts.approved}>
             Approved
-          </TabLink>
-          <TabLink href={baseQS("revision")} active={tab === "revision"} count={counts.revision}>
+          </TabPill>
+          <TabPill href={baseQS("revision")} active={tab === "revision"} count={counts.revision}>
             Needs revision
-          </TabLink>
+          </TabPill>
         </div>
 
         {/* ── Submit round CTA when nothing pending ───────────────────── */}
         {tab === "pending" && canSubmit ? (
-          <div className="surface p-5 mb-6 flex items-center justify-between flex-wrap gap-3">
+          <div className="glass mb-8 p-5 md:p-6 flex items-center justify-between flex-wrap gap-3">
             <div>
-              <p className="text-sm font-medium">All caught up for Round {currentRound?.number ?? 1}.</p>
-              <p className="text-xs text-muted mt-0.5">
+              <p className="text-sm font-medium">
+                All caught up for Round {currentRound?.number ?? 1}.
+              </p>
+              <p className="text-xs text-muted mt-1">
                 Submit your feedback so the post-production team gets one consolidated digest.
               </p>
             </div>
@@ -200,14 +197,19 @@ export default async function ProjectOverview({
         ) : null}
 
         {visible.length === 0 ? (
-          <div className="surface p-12 text-center text-sm text-muted">
-            {tab === "pending"
-              ? counts.approved + counts.revision === 0
-                ? "No images uploaded yet."
-                : "Nothing left to review — everything is decided."
-              : tab === "approved"
-                ? "No approved images yet."
-                : "No revisions requested."}
+          <div className="surface p-16 text-center">
+            <div className="mx-auto mb-4 h-10 w-10 bg-bg grid place-items-center">
+              <span className="h-2 w-2 rounded-full bg-muted-soft" />
+            </div>
+            <p className="text-sm text-muted">
+              {tab === "pending"
+                ? counts.approved + counts.revision === 0
+                  ? "No images uploaded yet."
+                  : "Nothing left to review — everything is decided."
+                : tab === "approved"
+                  ? "No approved images yet."
+                  : "No revisions requested."}
+            </p>
           </div>
         ) : (
           <ImageGridWithBulk
@@ -231,8 +233,7 @@ export default async function ProjectOverview({
             canActOnStatus={role !== "post_production"}
           />
         )}
-      </main>
-    </>
+    </main>
   );
 }
 
@@ -258,7 +259,7 @@ function RoundIndicator({
     <span className="inline-flex items-center gap-2">
       <span>Round {round.number}</span>
       <span
-        className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ${tone}`}
+        className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-medium ${tone}`}
       >
         <span className="h-1.5 w-1.5 rounded-full bg-current" />
         {round.status} · {detail}
@@ -267,7 +268,7 @@ function RoundIndicator({
   );
 }
 
-function TabLink({
+function TabPill({
   href,
   active,
   count,
@@ -282,17 +283,17 @@ function TabLink({
     <Link
       href={href}
       className={
-        active
-          ? "inline-flex items-center gap-2 px-4 py-2.5 text-sm border-b-2 border-ink -mb-px text-ink"
-          : "inline-flex items-center gap-2 px-4 py-2.5 text-sm border-b-2 border-transparent text-muted hover:text-ink transition-colors"
+        "inline-flex items-center gap-2 h-11 px-5 text-sm font-medium transition-colors border-b-2 -mb-px " +
+        (active
+          ? "border-ink text-ink"
+          : "border-transparent text-muted hover:text-ink")
       }
     >
       <span>{children}</span>
       <span
         className={
-          active
-            ? "h-5 min-w-5 px-1 rounded-full bg-ink text-bg text-[10px] inline-flex items-center justify-center font-semibold"
-            : "h-5 min-w-5 px-1 rounded-full bg-line/60 text-muted text-[10px] inline-flex items-center justify-center font-semibold"
+          "h-5 min-w-5 px-1.5 text-[10px] inline-flex items-center justify-center font-semibold tabular-nums " +
+          (active ? "bg-ink text-bg" : "bg-line/70 text-muted")
         }
       >
         {count}

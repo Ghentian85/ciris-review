@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Topbar } from "@/components/app/topbar";
-import { Button } from "@/components/ui/button";
-import { getCurrentUser, isOrgAdmin } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
 
@@ -69,61 +67,96 @@ export default async function WorkInbox() {
     .filter((p) => p.counts.revision > 0 || p.counts.notes > 0)
     .sort((a, b) => b.counts.revision - a.counts.revision);
 
+  const totalRevisions = projects.reduce((s, p) => s + p.counts.revision, 0);
+  const totalNotes = projects.reduce((s, p) => s + p.counts.notes, 0);
+
   return (
-    <>
-      <Topbar userEmail={user.email} isAdmin={await isOrgAdmin(user.id)} />
-      <main className="mx-auto max-w-7xl px-6 py-10">
-        <h1 className="text-2xl font-medium tracking-tight">Work</h1>
-        <p className="text-sm text-muted mt-1 mb-8">
-          Projects with feedback waiting for post-production.
-        </p>
+    <main className="mx-auto max-w-5xl px-6 pt-12 pb-16 animate-rise">
+        <div className="mb-10">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-muted mb-3 flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+            Post-production inbox
+          </p>
+          <h1 className="text-[40px] md:text-[48px] font-display font-medium tracking-tight leading-[1.05]">
+            Work
+          </h1>
+          <p className="text-sm text-muted mt-3">
+            {projects.length === 0
+              ? "All clear. Nothing needs your attention right now."
+              : `${projects.length} project${projects.length === 1 ? "" : "s"} · ${totalRevisions} revision${
+                  totalRevisions === 1 ? "" : "s"
+                }${totalNotes ? ` · ${totalNotes} note${totalNotes === 1 ? "" : "s"}` : ""}`}
+          </p>
+        </div>
 
         {projects.length === 0 ? (
-          <div className="surface p-12 text-center text-sm text-muted">
-            All clear. Nothing needs your attention right now.
+          <div className="surface-elev p-16 text-center max-w-xl mx-auto">
+            <div className="mx-auto mb-5 h-12 w-12 bg-status-approved-soft grid place-items-center">
+              <span className="h-2 w-2 rounded-full bg-status-approved" />
+            </div>
+            <h2 className="text-lg font-medium mb-1">Inbox zero</h2>
+            <p className="text-sm text-muted">
+              Nothing waiting for you. You&apos;ll see new revision requests here as
+              clients submit rounds.
+            </p>
           </div>
         ) : (
-          <div className="surface divide-y divide-line">
+          <div className="space-y-3">
             {projects.map(({ project, counts }) => {
               const lastRound = project.rounds[0];
               return (
                 <Link
                   key={project.id}
                   href={`/projects/${project.slug}?tab=revision`}
-                  className="p-4 flex items-center justify-between hover:bg-line/30 transition-colors"
+                  className="group surface p-5 flex items-center gap-4 press hover:shadow-pop transition-shadow"
                 >
-                  <div className="min-w-0">
-                    <p className="font-medium truncate">{project.name}</p>
-                    <p className="text-xs text-muted mt-0.5 truncate">
-                      {project.client?.name ?? "Internal"}
-                      {lastRound
-                        ? ` · Round ${lastRound.number} ${lastRound.status}`
-                        : ""}
-                      {lastRound?.closedAt
-                        ? ` · submitted ${formatDate(lastRound.closedAt)}`
-                        : ""}
+                  <div className="h-10 w-10 flex-shrink-0 bg-status-revision-soft grid place-items-center">
+                    <span className="h-2 w-2 rounded-full bg-status-revision" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium tracking-tight truncate group-hover:text-ink-soft transition-colors">
+                      {project.name}
+                    </p>
+                    <p className="text-xs text-muted mt-1 truncate">
+                      <span>{project.client?.name ?? "Internal"}</span>
+                      {lastRound ? (
+                        <>
+                          <span className="text-muted-soft mx-1.5">·</span>
+                          <span>
+                            Round {lastRound.number} {lastRound.status}
+                          </span>
+                        </>
+                      ) : null}
+                      {lastRound?.closedAt ? (
+                        <>
+                          <span className="text-muted-soft mx-1.5">·</span>
+                          <span>submitted {formatDate(lastRound.closedAt)}</span>
+                        </>
+                      ) : null}
                     </p>
                   </div>
-                  <div className="flex items-center gap-3 text-xs flex-shrink-0">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     {counts.revision > 0 ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-status-revision/30 bg-status-revision/5 text-status-revision px-2.5 py-0.5">
+                      <span className="inline-flex items-center gap-1.5 bg-status-revision-soft text-status-revision px-3 h-7 text-xs font-medium tabular-nums">
                         <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                        {counts.revision} revision{counts.revision === 1 ? "" : "s"}
+                        {counts.revision}
                       </span>
                     ) : null}
                     {counts.notes > 0 ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-status-notes/30 bg-status-notes/5 text-status-notes px-2.5 py-0.5">
+                      <span className="inline-flex items-center gap-1.5 bg-status-notes-soft text-status-notes px-3 h-7 text-xs font-medium tabular-nums">
                         <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                        {counts.notes} note{counts.notes === 1 ? "" : "s"}
+                        {counts.notes}
                       </span>
                     ) : null}
+                    <span className="text-muted-soft text-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                      →
+                    </span>
                   </div>
                 </Link>
               );
             })}
           </div>
         )}
-      </main>
-    </>
+    </main>
   );
 }

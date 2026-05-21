@@ -83,7 +83,7 @@ export function ProjectAdminRow({
             {project.name}
           </Link>
           {isArchived ? (
-            <span className="text-[10px] uppercase tracking-wide bg-line/60 text-muted px-2 py-0.5 rounded-full">
+            <span className="text-[10px] uppercase tracking-wide bg-line/60 text-muted px-2 py-0.5">
               Archived
             </span>
           ) : null}

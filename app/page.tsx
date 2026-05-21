@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Topbar } from "@/components/app/topbar";
 import { Button } from "@/components/ui/button";
-import { getCurrentUser, isOrgAdmin } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
 
@@ -62,82 +61,105 @@ export default async function Dashboard({
   });
 
   return (
-    <>
-      <Topbar userEmail={user.email} isAdmin={await isOrgAdmin(user.id)} />
-      <main className="mx-auto max-w-7xl px-6 py-10">
-        <div className="flex items-end justify-between mb-8 flex-wrap gap-3">
+    <main className="mx-auto max-w-7xl px-6 pt-12 pb-16 animate-rise">
+        <div className="flex items-end justify-between mb-10 flex-wrap gap-4">
           <div>
-            <h1 className="text-2xl font-medium tracking-tight">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-muted mb-3 flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+              {membership.organization.name}
+            </p>
+            <h1 className="text-[40px] md:text-[48px] font-display font-medium tracking-tight leading-[1.05]">
               {showArchived ? "Archived projects" : "Projects"}
             </h1>
-            <p className="text-sm text-muted mt-1">{membership.organization.name}</p>
+            <p className="text-sm text-muted mt-3">
+              {projects.length} {showArchived ? "archived" : "active"} ·{" "}
+              <span className="text-muted-soft">
+                {showArchived
+                  ? "read-only"
+                  : "review, comment, approve"}
+              </span>
+            </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {archivedCount > 0 || showArchived ? (
               <Link
                 href={showArchived ? "/" : "/?show=archived"}
-                className="text-xs text-muted hover:text-ink transition-colors"
+                className="text-xs text-muted hover:text-ink transition-colors h-9 px-3 inline-flex items-center hover:bg-ink/[0.04]"
               >
-                {showArchived
-                  ? "← Back to active"
-                  : `View archived (${archivedCount})`}
+                {showArchived ? "← Back to active" : `Archived (${archivedCount})`}
               </Link>
             ) : null}
             {!showArchived ? (
-              <Button asChild>
-                <Link href="/projects/new">New project</Link>
+              <Button asChild size="lg">
+                <Link href="/projects/new">+ New project</Link>
               </Button>
             ) : null}
           </div>
         </div>
 
         {projects.length === 0 ? (
-          <div className="surface p-12 text-center">
-            <p className="text-sm text-muted">
-              {showArchived ? "No archived projects." : "No projects yet."}
+          <div className="surface-elev p-16 text-center max-w-xl mx-auto">
+            <div className="mx-auto mb-5 h-12 w-12 bg-accent-soft grid place-items-center">
+              <span className="h-2 w-2 rounded-full bg-accent" />
+            </div>
+            <h2 className="text-lg font-medium mb-1">
+              {showArchived ? "No archived projects" : "No projects yet"}
+            </h2>
+            <p className="text-sm text-muted mb-6">
+              {showArchived
+                ? "Nothing in the archive."
+                : "Create one to start reviewing shoots and approvals."}
             </p>
             {!showArchived ? (
-              <Button asChild className="mt-4">
+              <Button asChild size="lg">
                 <Link href="/projects/new">Create your first project</Link>
               </Button>
             ) : null}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {projects.map((p) => {
               const cover = p.galleries[0]?.images[0]?.currentVersion?.storagePathThumb;
               return (
                 <Link
                   key={p.id}
                   href={`/projects/${p.slug}`}
-                  className="surface p-0 overflow-hidden hover:border-ink/30 transition-colors group"
+                  className="group surface p-0 overflow-hidden press hover:shadow-pop transition-shadow"
                 >
-                  <div className="aspect-[4/3] bg-line/40 relative overflow-hidden">
+                  <div className="aspect-[4/3] bg-line/30 relative overflow-hidden">
                     {cover ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={`/api/storage/${cover}`}
                         alt=""
-                        className="absolute inset-0 h-full w-full object-cover"
+                        className="absolute inset-0 h-full w-full object-cover transition-transform duration-[600ms] ease-out group-hover:scale-[1.03]"
                       />
-                    ) : null}
+                    ) : (
+                      <div className="absolute inset-0 grid place-items-center">
+                        <span className="text-[11px] text-muted-soft tracking-[0.2em] uppercase">
+                          No cover yet
+                        </span>
+                      </div>
+                    )}
+                    {/* Soft gradient sweep for text legibility on hover */}
+                    <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/15 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
-                  <div className="p-6">
-                    <h3 className="font-medium tracking-tight group-hover:underline underline-offset-4">
+                  <div className="p-5">
+                    <h3 className="font-display font-medium tracking-tight text-[17px] leading-snug">
                       {p.name}
                     </h3>
-                    <p className="text-xs text-muted mt-0.5">
-                      {p.client?.name ?? "No client"} · {p._count.galleries} galler
-                      {p._count.galleries === 1 ? "y" : "ies"}
+                    <p className="text-xs text-muted mt-1">
+                      {p.client?.name ?? "Internal"}
                     </p>
-                    <p className="text-xs text-muted mt-4">Updated {formatDate(p.updatedAt)}</p>
+                    <p className="text-[11px] text-muted-soft mt-4 tabular-nums">
+                      Updated {formatDate(p.updatedAt)}
+                    </p>
                   </div>
                 </Link>
               );
             })}
           </div>
         )}
-      </main>
-    </>
+    </main>
   );
 }

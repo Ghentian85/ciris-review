@@ -175,15 +175,20 @@ export function ImageGridWithBulk({
                       className="absolute inset-0 h-full w-full object-cover"
                     />
                   ) : null}
-                  <div className="absolute top-2 right-2">
-                    <StatusChip status={img.status as ImageStatus} />
-                  </div>
                 </div>
+                {/* Status moved OFF the image into the info strip — no
+                    visual overlap with the artwork. */}
                 <div className="p-3">
-                  <p className="text-xs truncate" title={img.displayName ?? img.slotName}>
-                    {img.displayName ?? img.slotName}
-                  </p>
-                  <p className="text-[10px] text-muted mt-0.5 truncate">
+                  <div className="flex items-center justify-between gap-2">
+                    <p
+                      className="text-xs truncate flex-1 min-w-0"
+                      title={img.displayName ?? img.slotName}
+                    >
+                      {img.displayName ?? img.slotName}
+                    </p>
+                    <StatusChip status={img.status as ImageStatus} size="sm" />
+                  </div>
+                  <p className="text-[10px] text-muted mt-1 truncate">
                     {img.galleryName}
                     {img.versionNumber > 1 ? ` · V${img.versionNumber}` : ""}
                   </p>

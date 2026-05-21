@@ -20,6 +20,10 @@ export type Comment = {
   visibility: "client" | "internal";
   createdAt: string;
   parentId: string | null;
+  // ISO timestamp when a post-prod / admin marked this comment done. null
+  // means still open. Surfaced separately from `replies` so the reviewer
+  // can render the checkbox state without an extra fetch.
+  resolvedAt: string | null;
   author: { id: string; email: string; name: string | null };
   annotations: Annotation[];
   replies: Reply[];

@@ -303,6 +303,11 @@ model Comment {
   body       String
   // client | internal
   visibility String   @default("client")
+  // Post-production / admins mark comments as "done" once the issue is
+  // addressed in the new version. Stored as a timestamp so we can show
+  // when + by whom without an extra audit query. Null = unresolved.
+  resolvedAt   DateTime?
+  resolvedById String?
   createdAt  DateTime @default(now())
 
   image    Image        @relation(fields: [imageId], references: [id], onDelete: Cascade)

@@ -177,6 +177,7 @@ export default async function ImageDetailPage({
       visibility: c.visibility as "client" | "internal",
       createdAt: c.createdAt.toISOString(),
       parentId: null,
+      resolvedAt: c.resolvedAt ? c.resolvedAt.toISOString() : null,
       author: c.author,
       annotations: c.annotations.map((a) => ({
         id: a.id,

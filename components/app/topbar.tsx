@@ -1,51 +1,64 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { NavLink } from "./nav-link";
+import { Logo } from "./logo";
 
+// Three-zone layout: logo left, primary nav perfectly centered, account
+// actions right. Grid with 1fr / auto / 1fr keeps center cell centered
+// regardless of left/right widths.
 export function Topbar({
   userEmail,
   isAdmin,
 }: {
   userEmail?: string;
-  // Owner / admin org-members get the Admin link. Pages compute this from
-  // their own membership lookup and pass it in — keeps Topbar a thin
-  // presentational component without extra DB hits.
+  // Owner / admin org-members get the Admin link. Resolved server-side in
+  // the root layout so the topbar stays a thin presentational component.
   isAdmin?: boolean;
 }) {
+  const initial = userEmail?.[0]?.toUpperCase() ?? "·";
   return (
-    <header className="border-b hairline bg-bg/80 backdrop-blur sticky top-0 z-30">
-      <div className="mx-auto max-w-7xl px-6 h-14 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2.5 text-ink">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/logo.svg"
-            alt="CIRIS"
-            className="h-5 w-auto"
-          />
-          <span className="text-[11px] text-muted tracking-[0.18em] uppercase">
+    <header className="sticky top-0 z-30 bg-ink/95 backdrop-blur-md text-bg shadow-pop">
+      <div className="mx-auto max-w-7xl px-5 h-16 grid grid-cols-[1fr_auto_1fr] items-center gap-6">
+        {/* ── Left: logo (pure white, square hit area) ─────── */}
+        <Link
+          href="/"
+          className="justify-self-start inline-flex items-center gap-3 h-10 pl-1 pr-3 hover:bg-white/[0.06] press text-white"
+          aria-label="CIRIS Review home"
+        >
+          <Logo />
+          <span className="hidden sm:inline text-[10px] tracking-[0.28em] uppercase font-medium opacity-60 border-l border-white/20 pl-3 ml-1">
             Review
           </span>
         </Link>
-        <nav className="flex items-center gap-6 text-sm">
-          <Link href="/" className="text-muted hover:text-ink transition-colors">
-            Projects
-          </Link>
-          <Link href="/work" className="text-muted hover:text-ink transition-colors">
-            Work
-          </Link>
-          {isAdmin ? (
-            <Link href="/admin" className="text-muted hover:text-ink transition-colors">
-              Admin
-            </Link>
-          ) : null}
+
+        {/* ── Center: primary nav ──────────────────────────── */}
+        <nav className="justify-self-center flex items-center gap-1">
+          <NavLink href="/">Projects</NavLink>
+          <NavLink href="/work">Work</NavLink>
+          {isAdmin ? <NavLink href="/admin">Admin</NavLink> : null}
+        </nav>
+
+        {/* ── Right: account (square avatar) ──────────────── */}
+        <div className="justify-self-end flex items-center gap-2">
           {userEmail ? (
-            <form action="/api/auth/logout" method="post" className="flex items-center gap-3">
-              <span className="text-muted text-xs">{userEmail}</span>
-              <Button type="submit" variant="ghost" size="sm">
+            <form action="/api/auth/logout" method="post" className="flex items-center gap-2">
+              <span
+                className="hidden md:flex items-center gap-2 h-10 pl-2 pr-3"
+                title={userEmail}
+              >
+                <span className="h-7 w-7 bg-bg text-ink grid place-items-center text-[11px] font-semibold uppercase">
+                  {initial}
+                </span>
+                <span className="text-xs max-w-[200px] truncate text-bg/70">
+                  {userEmail}
+                </span>
+              </span>
+              <Button type="submit" variant="outline" size="sm" className="border-bg/20 bg-bg/0 text-bg hover:bg-bg/10 hover:border-bg/30">
                 Sign out
               </Button>
             </form>
           ) : null}
-        </nav>
+        </div>
       </div>
     </header>
   );

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Topbar } from "@/components/app/topbar";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
@@ -70,9 +69,7 @@ export default async function AdminPage() {
   const archivedCount = projects.filter((p) => p.status === "archived").length;
 
   return (
-    <>
-      <Topbar userEmail={user.email} isAdmin={isAdmin} />
-      <main className="mx-auto max-w-7xl px-6 py-10">
+    <main className="mx-auto max-w-7xl px-6 py-10">
         <div className="mb-8">
           <p className="text-xs uppercase tracking-wide text-muted mb-2">
             {membership.organization.name}
@@ -191,7 +188,6 @@ export default async function AdminPage() {
             </div>
           )}
         </section>
-      </main>
-    </>
+    </main>
   );
 }

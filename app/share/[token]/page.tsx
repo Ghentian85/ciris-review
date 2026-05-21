@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
 import { StatusChip, type ImageStatus } from "@/components/ui/status-chip";
+import { Logo } from "@/components/app/logo";
 import { PasswordGate } from "./password-gate";
 
 // Public, unauthenticated review page. Reachable by anyone with the token
@@ -51,29 +52,15 @@ export default async function PublicSharePage({
   });
 
   if (!link) {
-    return (
-      <main className="min-h-screen grid place-items-center p-6">
-        <div className="surface p-8 max-w-sm text-center">
-          <h1 className="font-medium">Link unavailable</h1>
-          <p className="text-sm text-muted mt-2">
-            This share link doesn't exist or has been revoked.
-          </p>
-        </div>
-      </main>
-    );
+    return <BlockedScreen title="Link unavailable" body="This share link doesn't exist or has been revoked." />;
   }
 
   if (link.expiresAt && link.expiresAt < new Date()) {
     return (
-      <main className="min-h-screen grid place-items-center p-6">
-        <div className="surface p-8 max-w-sm text-center">
-          <h1 className="font-medium">Link expired</h1>
-          <p className="text-sm text-muted mt-2">
-            This share link expired on {link.expiresAt.toLocaleDateString()}.
-            Ask whoever sent you the link for a fresh one.
-          </p>
-        </div>
-      </main>
+      <BlockedScreen
+        title="Link expired"
+        body={`This share link expired on ${link.expiresAt.toLocaleDateString()}. Ask whoever sent you the link for a fresh one.`}
+      />
     );
   }
 
@@ -87,12 +74,25 @@ export default async function PublicSharePage({
 
     if (!sessionOk && !passwordOk) {
       return (
-        <main className="min-h-screen grid place-items-center p-6">
+        <main className="min-h-screen grid place-items-center p-6 animate-rise">
           <div className="w-full max-w-sm">
-            <div className="mb-8 text-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.svg" alt="CIRIS" className="h-6 w-auto mx-auto mb-3" />
-              <p className="text-xs text-muted tracking-[0.18em] uppercase">Review</p>
+            <div className="mb-10 text-center text-ink">
+              <Logo className="h-7 w-auto mx-auto" />
+              <p className="text-[10px] text-muted tracking-[0.28em] uppercase mt-3 font-medium">
+                Review
+              </p>
+            </div>
+            <div className="mb-6 text-center">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-muted mb-3 flex items-center justify-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+                Password protected
+              </p>
+              <h1 className="font-display text-[26px] leading-tight tracking-tight">
+                {link.project.name}
+              </h1>
+              <p className="text-sm text-muted mt-2">
+                Enter the password you were given to continue.
+              </p>
             </div>
             <PasswordGate token={token} />
           </div>
@@ -123,30 +123,37 @@ export default async function PublicSharePage({
 
   return (
     <>
-      <header className="border-b hairline bg-bg/80 backdrop-blur sticky top-0 z-30">
-        <div className="mx-auto max-w-7xl px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.svg" alt="CIRIS" className="h-5 w-auto" />
-            <span className="text-[11px] text-muted tracking-[0.18em] uppercase">
+      <header className="sticky top-0 z-30 bg-ink text-bg">
+        <div className="mx-auto max-w-7xl px-5 h-16 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 text-bg">
+            <Logo />
+            <span className="hidden sm:inline text-[10px] tracking-[0.28em] uppercase font-medium opacity-60 border-l border-bg/20 pl-3 ml-1">
               Review · Shared
             </span>
           </div>
-          {link.expiresAt ? (
-            <span className="text-[11px] text-muted">
-              expires {link.expiresAt.toLocaleDateString()}
+          <div className="flex items-center gap-3 text-[11px]">
+            <span className="text-bg/50 hidden sm:inline">
+              Read-only preview
             </span>
-          ) : null}
+            {link.expiresAt ? (
+              <span className="text-bg/70 tabular-nums">
+                expires {link.expiresAt.toLocaleDateString()}
+              </span>
+            ) : null}
+          </div>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-6 py-10">
-        <div className="mb-8">
-          <p className="text-xs uppercase tracking-wide text-muted mb-2">
+      <main className="mx-auto max-w-7xl px-6 pt-10 pb-16 animate-rise">
+        <div className="mb-10">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-muted mb-3 flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
             {link.project.client?.name ?? "Project preview"}
           </p>
-          <h1 className="text-2xl font-medium tracking-tight">{link.project.name}</h1>
-          <p className="text-sm text-muted mt-1">
-            {images.length} image{images.length === 1 ? "" : "s"} · read-only preview
+          <h1 className="font-display text-[40px] md:text-[44px] font-medium tracking-tight leading-[1.05]">
+            {link.project.name}
+          </h1>
+          <p className="text-sm text-muted mt-3">
+            {images.length} image{images.length === 1 ? "" : "s"} · read-only
           </p>
         </div>
 
@@ -172,15 +179,15 @@ export default async function PublicSharePage({
                         className="absolute inset-0 h-full w-full object-cover"
                       />
                     ) : null}
-                    <div className="absolute top-2 right-2">
-                      <StatusChip status={img.status as ImageStatus} />
-                    </div>
                   </div>
                   <div className="p-3">
-                    <p className="text-xs truncate">
-                      {img.displayName ?? img.slotName}
-                    </p>
-                    <p className="text-[10px] text-muted mt-0.5 truncate">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs truncate flex-1 min-w-0">
+                        {img.displayName ?? img.slotName}
+                      </p>
+                      <StatusChip status={img.status as ImageStatus} size="sm" />
+                    </div>
+                    <p className="text-[10px] text-muted mt-1 truncate">
                       {img.gallery.name}
                       {img.currentVersion && img.currentVersion.versionNumber > 1
                         ? ` · V${img.currentVersion.versionNumber}`
@@ -193,10 +200,32 @@ export default async function PublicSharePage({
           </div>
         )}
 
-        <p className="text-[11px] text-muted text-center mt-10">
+        <p className="text-[11px] text-muted-soft text-center mt-12">
           For full review with comments and approval, ask to be invited as a reviewer.
         </p>
       </main>
     </>
+  );
+}
+
+function BlockedScreen({ title, body }: { title: string; body: string }) {
+  return (
+    <main className="min-h-screen grid place-items-center p-6 animate-rise">
+      <div className="w-full max-w-sm text-center">
+        <div className="mb-8 text-ink">
+          <Logo className="h-7 w-auto mx-auto" />
+          <p className="text-[10px] text-muted tracking-[0.28em] uppercase mt-3 font-medium">
+            Review
+          </p>
+        </div>
+        <div className="surface p-8">
+          <div className="mx-auto mb-4 h-10 w-10 bg-status-revision-soft grid place-items-center">
+            <span className="h-2 w-2 rounded-full bg-status-revision" />
+          </div>
+          <h1 className="font-medium text-base">{title}</h1>
+          <p className="text-sm text-muted mt-2 leading-relaxed">{body}</p>
+        </div>
+      </div>
+    </main>
   );
 }
