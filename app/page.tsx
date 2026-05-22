@@ -33,10 +33,13 @@ export default async function Dashboard({
     });
   }
 
+  // client_reviewer and post_production only see projects they're a member of
+  const isLimitedRole = ["client_reviewer", "post_production"].includes(membership.role);
   const projects = await prisma.project.findMany({
     where: {
       orgId: membership.orgId,
       status: showArchived ? "archived" : { not: "archived" },
+      ...(isLimitedRole ? { members: { some: { userId: user.id } } } : {}),
     },
     orderBy: { updatedAt: "desc" },
     include: {
@@ -89,7 +92,7 @@ export default async function Dashboard({
                 {showArchived ? "← Back to active" : `Archived (${archivedCount})`}
               </Link>
             ) : null}
-            {!showArchived ? (
+            {!showArchived && !isLimitedRole ? (
               <Button asChild size="lg">
                 <Link href="/projects/new">+ New project</Link>
               </Button>
@@ -110,7 +113,7 @@ export default async function Dashboard({
                 ? "Nothing in the archive."
                 : "Create one to start reviewing shoots and approvals."}
             </p>
-            {!showArchived ? (
+            {!showArchived && !isLimitedRole ? (
               <Button asChild size="lg">
                 <Link href="/projects/new">Create your first project</Link>
               </Button>
