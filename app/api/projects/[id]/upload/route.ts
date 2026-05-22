@@ -4,6 +4,16 @@ import { getCurrentUser } from "@/lib/auth";
 import { storeImageVersion } from "@/lib/storage";
 import { parseSlot } from "@/lib/parse-slot";
 
+// Increase body size limit for large image uploads (fashion shoots can be 80MB+)
+export const config = {
+  api: {
+    bodyParser: false,
+    responseLimit: "200mb",
+  },
+};
+
+export const maxDuration = 60;
+
 // One file per request. Client uploads in parallel with a concurrency cap.
 // Large fashion shoots (200–800 files at 30–80MB) bust the per-request body
 // limit, so we never bundle multi-file uploads into one POST.
