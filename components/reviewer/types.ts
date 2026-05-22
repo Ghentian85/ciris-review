@@ -57,6 +57,7 @@ export type SiblingView = {
   id: string;
   viewLabel: string | null;
   href: string;
+  previewPath?: string;
 };
 
 export type VersionEntry = {

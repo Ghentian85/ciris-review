@@ -142,6 +142,7 @@ export default async function ImageDetailPage({
     id: s.id,
     viewLabel: s.viewLabel,
     href: `${baseHref}/${s.id}${querySuffix}`,
+    previewPath: s.currentVersion?.storagePathPreview ?? undefined,
   }));
 
   // Comments + annotations are version-scoped; only load the ones tied to

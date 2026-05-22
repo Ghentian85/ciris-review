@@ -270,6 +270,21 @@ export function Reviewer(props: Props) {
     if (nextHref) router.prefetch(nextHref);
   }, [prevHref, nextHref, router]);
 
+  // Preload prev/next images so navigation feels instant
+  useEffect(() => {
+    const toPreload = siblings
+      .filter((s) => s.previewPath && s.id !== image.id)
+      .slice(0, 4)
+      .map((s) => `/api/storage/${s.previewPath}`);
+    toPreload.forEach((url) => {
+      const link = document.createElement("link");
+      link.rel = "prefetch";
+      link.as = "image";
+      link.href = url;
+      document.head.appendChild(link);
+    });
+  }, [siblings, image.id]);
+
   // ─── Server actions ──────────────────────────────────────────────────────
   const handleCommit = useCallback(
     (draft: PendingDraft) => {
@@ -300,6 +315,15 @@ export function Reviewer(props: Props) {
       // New top-level comment: no replies yet, parentId null.
       setComments((cur) => [...cur, { ...json.comment, parentId: null, replies: [] }]);
       setPending(null);
+      // Auto-set status to revision_requested when client leaves first comment
+      if (role === "client_reviewer" && image.status === "pending") {
+        await fetch(`/api/images/${image.id}/status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "revision_requested" }),
+        });
+        setOptimisticStatus("revision_requested");
+      }
     } catch (err) {
       console.error(err);
     } finally {
