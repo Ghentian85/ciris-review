@@ -34,7 +34,15 @@ export default async function Dashboard({
   }
 
   // client_reviewer and post_production only see projects they're a member of
-  const isLimitedRole = ["client_reviewer", "post_production"].includes(membership.role);
+  // Check both org role and any project-level role for this user
+  const projectRoles = await prisma.projectMember.findMany({
+    where: { userId: user.id, project: { orgId: membership.orgId } },
+    select: { role: true },
+  });
+  const isLimitedRole =
+    ["client_reviewer", "post_production"].includes(membership.role) ||
+    (projectRoles.length > 0 &&
+      projectRoles.every((m) => ["client_reviewer", "post_production"].includes(m.role)));
   const projects = await prisma.project.findMany({
     where: {
       orgId: membership.orgId,
