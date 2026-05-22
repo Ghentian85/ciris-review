@@ -357,7 +357,7 @@ export function Reviewer(props: Props) {
     setComments(remaining);
     if (activeCommentId === commentId) setActiveCommentId(null);
     // If client removed all comments, reset status back to pending
-    if (role === "client_reviewer" && remaining.length === 0 && image.status === "revision_requested") {
+    if (role === "client_reviewer" && remaining.length === 0 && (effectiveStatus === "revision_requested" || image.status === "revision_requested")) {
       await fetch(`/api/images/${image.id}/status`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
