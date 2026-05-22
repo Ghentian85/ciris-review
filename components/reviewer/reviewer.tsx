@@ -708,6 +708,42 @@ export function Reviewer(props: Props) {
     </div>
   ) : null;
 
+  // Admin-only delete (soft-kill) action
+  const [deleteConfirm, setDeleteConfirm] = React.useState(false);
+  const [deleteBusy, setDeleteBusy] = React.useState(false);
+  async function handleDelete() {
+    if (!deleteConfirm) { setDeleteConfirm(true); return; }
+    setDeleteBusy(true);
+    try {
+      await fetch(`/api/images/${image.id}`, { method: "DELETE" });
+      window.history.back();
+    } finally {
+      setDeleteBusy(false);
+      setDeleteConfirm(false);
+    }
+  }
+  const deleteAction = role === "admin" && !isHistory && !isCompareMode ? (
+    <div className="pt-2 border-t border-line">
+      <button
+        onClick={handleDelete}
+        disabled={deleteBusy}
+        className={`w-full text-xs px-3 py-1.5 rounded border transition-colors ${
+          deleteConfirm
+            ? "border-red-400 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+            : "border-line text-muted hover:border-red-400/50 hover:text-red-400"
+        }`}
+      >
+        {deleteBusy ? "Deleting…" : deleteConfirm ? "Confirm delete?" : "Delete image"}
+      </button>
+      {deleteConfirm && !deleteBusy && (
+        <button
+          onClick={() => setDeleteConfirm(false)}
+          className="w-full text-xs text-muted mt-1 hover:text-ink"
+        >Cancel</button>
+      )}
+    </div>
+  ) : null;
+
   // Anyone except the client can resolve. Resolving means "post-prod has
   // addressed this in the next version" — workflow signal, not editing.
   const canResolve = role !== "client_reviewer";
@@ -1093,6 +1129,7 @@ export function Reviewer(props: Props) {
 
             <div className="p-5 border-t hairline space-y-4">
               {statusActions}
+              {deleteAction}
               <ShortcutLegend />
             </div>
           </aside>
@@ -1173,6 +1210,7 @@ export function Reviewer(props: Props) {
               {historyBanner}
 
               {statusActions}
+              {deleteAction}
 
               <div>
                 <CommentsHeader comments={comments} className="mb-3" />
