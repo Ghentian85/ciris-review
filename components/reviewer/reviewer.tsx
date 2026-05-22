@@ -353,8 +353,18 @@ export function Reviewer(props: Props) {
   async function deleteComment(commentId: string) {
     const res = await fetch(`/api/comments/${commentId}`, { method: "DELETE" });
     if (!res.ok) return;
-    setComments((cur) => cur.filter((c) => c.id !== commentId));
+    const remaining = comments.filter((c) => c.id !== commentId);
+    setComments(remaining);
     if (activeCommentId === commentId) setActiveCommentId(null);
+    // If client removed all comments, reset status back to pending
+    if (role === "client_reviewer" && remaining.length === 0 && image.status === "revision_requested") {
+      await fetch(`/api/images/${image.id}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "pending" }),
+      });
+      setOptimisticStatus("pending");
+    }
   }
 
   // Post-prod / admin / internal_reviewer can mark feedback "done" once
