@@ -74,7 +74,7 @@ export default async function ProjectOverview({
       },
       gallery: { select: { id: true, name: true } },
     },
-    orderBy: [{ gallery: { position: "asc" } }, { position: "asc" }],
+    orderBy: [{ gallery: { position: "asc" } }, { slotName: "asc" }],
   });
 
   const counts = { pending: 0, approved: 0, revision: 0 };
