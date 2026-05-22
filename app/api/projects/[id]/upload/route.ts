@@ -28,6 +28,19 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
+  return await uploadHandler(req, params);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[upload] unhandled error:', msg, err);
+    return NextResponse.json({ error: 'Internal server error', detail: msg }, { status: 500 });
+  }
+}
+
+async function uploadHandler(
+  req: NextRequest,
+  params: Promise<{ id: string }>
+) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
