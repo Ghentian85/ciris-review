@@ -709,8 +709,8 @@ export function Reviewer(props: Props) {
   ) : null;
 
   // Admin-only delete (soft-kill) action
-  const [deleteConfirm, setDeleteConfirm] = React.useState(false);
-  const [deleteBusy, setDeleteBusy] = React.useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   async function handleDelete() {
     if (!deleteConfirm) { setDeleteConfirm(true); return; }
     setDeleteBusy(true);
