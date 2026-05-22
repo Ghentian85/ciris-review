@@ -21,6 +21,14 @@ export default async function Dashboard({
     include: { organization: true },
   });
   if (!membership) {
+    // Before creating a new org, check if this user has a pending invite.
+    // If so, don't auto-create — show a "check your email" message instead.
+    const pendingInvite = await prisma.invite.findFirst({
+      where: { email: user.email, acceptedAt: null, expiresAt: { gt: new Date() } },
+    });
+    if (pendingInvite) {
+      redirect("/invite-pending");
+    }
     const org = await prisma.organization.create({
       data: {
         name: user.name ? `${user.name}'s Studio` : "My Studio",
@@ -33,16 +41,17 @@ export default async function Dashboard({
     });
   }
 
-  // client_reviewer and post_production only see projects they're a member of
-  // Check both org role and any project-level role for this user
+  // Limited roles: client_reviewer and post_production only see their own projects
+  // and cannot create new projects. Check project-level roles.
   const projectRoles = await prisma.projectMember.findMany({
     where: { userId: user.id, project: { orgId: membership.orgId } },
     select: { role: true },
   });
+  const LIMITED_ROLES = ["client_reviewer", "post_production"];
   const isLimitedRole =
-    ["client_reviewer", "post_production"].includes(membership.role) ||
+    LIMITED_ROLES.includes(membership.role) ||
     (projectRoles.length > 0 &&
-      projectRoles.every((m) => ["client_reviewer", "post_production"].includes(m.role)));
+      projectRoles.every((m) => LIMITED_ROLES.includes(m.role)));
   const projects = await prisma.project.findMany({
     where: {
       orgId: membership.orgId,
