@@ -13,6 +13,7 @@
     "seed:demo-roles": "tsx scripts/seed-demo-roles.ts",
     "db:use-sqlite": "node scripts/swap-db-provider.mjs sqlite",
     "db:use-postgres": "node scripts/swap-db-provider.mjs postgresql",
+    "db:push-prod": "node scripts/db-push-prod.mjs",
     "build:prod": "node scripts/swap-db-provider.mjs postgresql && prisma generate && next build",
     "postinstall": "prisma generate"
   },
