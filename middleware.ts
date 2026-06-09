@@ -17,6 +17,9 @@ const PUBLIC_PATHS = [
   "/favicon.ico",
   // Static branding — needs to load even on the login page.
   "/logo.svg",
+  // User guide — public so prospects, new hires, and confused clients
+  // can read it without needing an account first.
+  "/help",
   // Public share links: unauthed visitors with a valid token can view.
   "/share",
   "/api/share-verify",

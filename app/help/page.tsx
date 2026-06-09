@@ -1,14 +1,12 @@
-import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { HelpTabs } from "./help-tabs";
 
-// Picks the most-likely-relevant tab for the signed-in user. Defaults to
-// "admin" since the studio team uses /help most. Anyone can switch tabs.
+// /help is public. Signed-in users get a tab pre-selected based on the
+// roles they hold across their projects; anonymous visitors land on the
+// admin tab by default (most likely audience checking the platform out).
 async function defaultTabForUser(userId: string): Promise<"admin" | "client" | "post-prod"> {
-  // Look at the user's project memberships. Heuristic: if they're a client
-  // anywhere, default to the client guide; if they're post-prod anywhere,
-  // default to that; otherwise admin/internal → admin guide.
   const memberships = await prisma.projectMember.findMany({
     where: { userId },
     select: { role: true },
@@ -21,9 +19,7 @@ async function defaultTabForUser(userId: string): Promise<"admin" | "client" | "
 
 export default async function HelpPage() {
   const user = await getCurrentUser();
-  if (!user) redirect("/login?next=/help");
-
-  const defaultTab = await defaultTabForUser(user.id);
+  const defaultTab = user ? await defaultTabForUser(user.id) : "admin";
 
   return (
     <main className="mx-auto max-w-3xl px-6 pt-12 pb-24">
@@ -37,11 +33,22 @@ export default async function HelpPage() {
         </h1>
         <p className="text-sm text-muted mt-3 max-w-xl">
           Three short guides — one per role. Pick the tab that matches you.
-          You can also switch between them anytime.
+          You can also link straight to a single role:{" "}
+          <DirectLink href="/help/admin">Studios</DirectLink>,{" "}
+          <DirectLink href="/help/client">Clients</DirectLink>,{" "}
+          <DirectLink href="/help/post-prod">Post-production</DirectLink>.
         </p>
       </div>
 
       <HelpTabs defaultTab={defaultTab} />
     </main>
+  );
+}
+
+function DirectLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link href={href} className="text-ink underline underline-offset-4 hover:text-accent">
+      {children}
+    </Link>
   );
 }
