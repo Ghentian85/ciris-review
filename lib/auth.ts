@@ -124,7 +124,24 @@ export async function consumeLoginToken(raw: string) {
 
 // ---------- Sessions ----------
 
-export async function createSession(userId: string, userAgent?: string) {
+// Cookie config shared by both flavors below. Centralised so a tweak (e.g.
+// SameSite=none for cross-origin embeds later) lands in one place.
+function sessionCookieOptions(expiresAt: Date) {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    expires: expiresAt,
+  };
+}
+
+// Returns the cookie payload + creates the DB session — but does NOT touch
+// cookies(). Use this from Route Handlers that build their own NextResponse
+// (verify, signin) — those need to attach the cookie directly to the
+// response object because cookies set via next/headers don't follow
+// onto a freshly-constructed NextResponse.redirect/json.
+export async function mintSession(userId: string, userAgent?: string) {
   const raw = newRawToken();
   const tokenHash = sha256(raw);
   const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60_000);
@@ -132,15 +149,22 @@ export async function createSession(userId: string, userAgent?: string) {
     data: { userId, tokenHash, expiresAt, userAgent: userAgent ?? null },
   });
   const signed = `${raw}.${sign(raw)}`;
+  return {
+    name: SESSION_COOKIE,
+    value: signed,
+    options: sessionCookieOptions(expiresAt),
+  };
+}
+
+// Sets the cookie via next/headers — only safe in Server Action /
+// Middleware contexts where the response is built by Next itself. Route
+// Handlers that return `NextResponse.redirect()` MUST use mintSession +
+// `response.cookies.set(...)` instead.
+export async function createSession(userId: string, userAgent?: string) {
+  const session = await mintSession(userId, userAgent);
   const jar = await cookies();
-  jar.set(SESSION_COOKIE, signed, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    expires: expiresAt,
-  });
-  return raw;
+  jar.set(session.name, session.value, session.options);
+  return session.value;
 }
 
 export async function destroySession() {

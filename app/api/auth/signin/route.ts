@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { authenticatePassword, createSession } from "@/lib/auth";
+import { authenticatePassword, mintSession } from "@/lib/auth";
 
 const schema = z.object({
   email: z.string().email(),
@@ -22,6 +22,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }
 
-  await createSession(user.id, req.headers.get("user-agent") ?? undefined);
-  return NextResponse.json({ ok: true });
+  // Mint session + attach cookie directly to the response — next/headers
+  // cookie writes don't reliably follow onto a fresh NextResponse in
+  // Route Handlers.
+  const session = await mintSession(user.id, req.headers.get("user-agent") ?? undefined);
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set(session.name, session.value, session.options);
+  return response;
 }
