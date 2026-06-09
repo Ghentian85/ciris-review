@@ -132,6 +132,71 @@ export function magicLinkEmail(url: string) {
   return { subject, text, html };
 }
 
+// Password reset / "set password" link. Same one-click sign-in pattern as
+// magic links, but the landing page asks for a new password. Sent from the
+// /api/auth/forgot endpoint and from the admin "Send password reset"
+// action in the members panel.
+export function passwordResetEmail(opts: { url: string; expiresHours: number }) {
+  const subject = "Reset your CIRIS Review password";
+  const text = [
+    "Click the link below to set a new password. You'll be signed in automatically.",
+    "",
+    opts.url,
+    "",
+    `Link expires in ${opts.expiresHours} hours. If you didn't request this, ignore this email.`,
+  ].join("\n");
+  const html = shell({
+    preheader: `Set a new password — link expires in ${opts.expiresHours} hours.`,
+    title: subject,
+    bodyHtml: `
+      <h1 style="margin:0 0 12px;font-size:20px;font-weight:600;color:#1c1917;">Reset your password</h1>
+      <p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#44403c;">Click the button below to sign in and pick a new password.</p>
+      ${button(opts.url, "Set a new password")}
+      <p style="margin:0;font-size:12px;line-height:1.6;color:#78716c;">Or paste this URL into your browser:<br><span style="word-break:break-all;color:#44403c;">${escapeHtml(opts.url)}</span></p>
+      <p style="margin:16px 0 0;font-size:12px;line-height:1.6;color:#78716c;">Link expires in ${opts.expiresHours} hours. If you didn't request this, you can safely ignore this email.</p>
+    `,
+  });
+  return { subject, text, html };
+}
+
+// One-click project invite. The link both signs the recipient in AND adds
+// them to the project — no separate magic-link round-trip. The token is the
+// secret: anyone with this URL gets access, same trust model as magic links.
+export function inviteEmail(opts: {
+  projectName: string;
+  orgName: string;
+  inviterName: string | null;
+  role: string;
+  url: string;
+  expiresDays: number;
+}) {
+  const roleLabel = opts.role.replace(/_/g, " ");
+  const subject = `${opts.inviterName ?? opts.orgName} invited you to review ${opts.projectName}`;
+  const text = [
+    `${opts.inviterName ?? opts.orgName} invited you to ${opts.projectName} as ${roleLabel}.`,
+    "",
+    "Open this link to start reviewing. You'll be signed in automatically:",
+    "",
+    opts.url,
+    "",
+    `Link expires in ${opts.expiresDays} days. One-time use.`,
+  ].join("\n");
+  const html = shell({
+    preheader: `One-click access to ${opts.projectName} — no password needed.`,
+    title: subject,
+    bodyHtml: `
+      <p style="margin:0 0 6px;font-size:12px;line-height:1.6;color:#78716c;letter-spacing:0.05em;text-transform:uppercase;">${escapeHtml(opts.orgName)}</p>
+      <h1 style="margin:0 0 12px;font-size:22px;font-weight:600;color:#1c1917;">You're invited to ${escapeHtml(opts.projectName)}</h1>
+      <p style="margin:0 0 6px;font-size:14px;line-height:1.6;color:#44403c;">${escapeHtml(opts.inviterName ?? opts.orgName)} added you as <strong>${escapeHtml(roleLabel)}</strong>.</p>
+      <p style="margin:0 0 4px;font-size:14px;line-height:1.6;color:#44403c;">One click on the button below signs you in and opens the project. No password needed.</p>
+      ${button(opts.url, "Open the project")}
+      <p style="margin:0;font-size:12px;line-height:1.6;color:#78716c;">Or paste this URL into your browser:<br><span style="word-break:break-all;color:#44403c;">${escapeHtml(opts.url)}</span></p>
+      <p style="margin:16px 0 0;font-size:12px;line-height:1.6;color:#78716c;">Link expires in ${opts.expiresDays} days. One-time use — share it only with yourself.</p>
+    `,
+  });
+  return { subject, text, html };
+}
+
 export type DigestImageItem = {
   slot: string;
   displayName: string | null;

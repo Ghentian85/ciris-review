@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createHash, randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { sendEmail } from "@/lib/email";
+import { sendEmail, inviteEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 
 const schema = z.object({
@@ -47,13 +47,20 @@ export async function POST(
     },
   });
 
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  const url = `${env.APP_URL}/invite/${raw}`;
-  const result = await sendEmail({
-    to: parsed.data.email,
-    subject: `You've been invited to review ${project?.name ?? "a project"}`,
-    text: `Open this link to accept the invitation:\n\n${url}\n\nLink expires in ${INVITE_TTL_DAYS} days.`,
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: { organization: { select: { name: true } } },
   });
+  const url = `${env.APP_URL}/invite/${raw}`;
+  const tpl = inviteEmail({
+    projectName: project?.name ?? "a project",
+    orgName: project?.organization.name ?? "CIRIS Review",
+    inviterName: user.name,
+    role: parsed.data.role,
+    url,
+    expiresDays: INVITE_TTL_DAYS,
+  });
+  const result = await sendEmail({ to: parsed.data.email, ...tpl });
 
   return NextResponse.json({
     ok: true,

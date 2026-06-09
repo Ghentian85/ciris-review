@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, mintSignInUrl } from "@/lib/auth";
 import { sendEmail, roundReadyClientEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 
@@ -96,18 +96,30 @@ export async function POST(
     },
   });
 
-  const projectUrl = `${env.APP_URL}/projects/${project.slug}`;
+  // Per-recipient one-click sign-in URLs. Each email gets its own short-
+  // lived token that signs the client in AND lands them on the project —
+  // no /login + magic-link round-trip when the session has expired.
+  const projectPath = `/projects/${project.slug}`;
   const clientRecipients = project.members
     .filter((m) => m.role === "client_reviewer")
     .map((m) => m.user.email);
 
-  const tpl = roundReadyClientEmail({
-    projectName: project.name,
-    roundNumber: round.number,
-    imageCount: Math.max(imageCount, 1),
-    projectUrl,
-  });
-  await Promise.all(clientRecipients.map((to) => sendEmail({ to, ...tpl })));
+  await Promise.all(
+    clientRecipients.map(async (to) => {
+      const projectUrl = await mintSignInUrl({
+        baseUrl: env.APP_URL,
+        email: to,
+        nextPath: projectPath,
+      });
+      const tpl = roundReadyClientEmail({
+        projectName: project.name,
+        roundNumber: round.number,
+        imageCount: Math.max(imageCount, 1),
+        projectUrl,
+      });
+      return sendEmail({ to, ...tpl });
+    })
+  );
 
   return NextResponse.json({
     ok: true,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, mintSignInUrl } from "@/lib/auth";
 import {
   sendEmail,
   roundDigestEmail,
@@ -168,7 +168,9 @@ export async function POST(
     .map(toItem);
 
   // Fire-and-forget emails — never block the response on delivery.
-  const projectUrl = `${env.APP_URL}/projects/${project.slug}`;
+  // Per-recipient one-click sign-in URLs so post-prod can jump straight
+  // into the project from the digest, even weeks later.
+  const projectPath = `/projects/${project.slug}`;
   const postProdRecipients = project.members
     .filter((m) => m.role === "post_production" || m.role === "admin")
     .map((m) => m.user.email);
@@ -176,15 +178,6 @@ export async function POST(
     .filter((m) => m.role === "client_reviewer")
     .map((m) => m.user.email);
 
-  const digest = roundDigestEmail({
-    projectName: project.name,
-    clientName: project.client?.name ?? null,
-    roundNumber: round.number,
-    counts,
-    projectUrl,
-    revisionItems,
-    notesItems,
-  });
   const confirm = roundSubmittedClientEmail({
     projectName: project.name,
     roundNumber: round.number,
@@ -192,7 +185,23 @@ export async function POST(
   });
 
   await Promise.all([
-    ...postProdRecipients.map((to) => sendEmail({ to, ...digest })),
+    ...postProdRecipients.map(async (to) => {
+      const projectUrl = await mintSignInUrl({
+        baseUrl: env.APP_URL,
+        email: to,
+        nextPath: projectPath,
+      });
+      const digest = roundDigestEmail({
+        projectName: project.name,
+        clientName: project.client?.name ?? null,
+        roundNumber: round.number,
+        counts,
+        projectUrl,
+        revisionItems,
+        notesItems,
+      });
+      return sendEmail({ to, ...digest });
+    }),
     ...clientRecipients.map((to) => sendEmail({ to, ...confirm })),
   ]);
 

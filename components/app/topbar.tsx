@@ -38,13 +38,14 @@ export function Topbar({
           {isAdmin ? <NavLink href="/admin">Admin</NavLink> : null}
         </nav>
 
-        {/* ── Right: account (square avatar) ──────────────── */}
+        {/* ── Right: account (square avatar → /account/password) ──── */}
         <div className="justify-self-end flex items-center gap-2">
           {userEmail ? (
-            <form action="/api/auth/logout" method="post" className="flex items-center gap-2">
-              <span
-                className="hidden md:flex items-center gap-2 h-10 pl-2 pr-3"
-                title={userEmail}
+            <>
+              <Link
+                href="/account/password"
+                className="hidden md:flex items-center gap-2 h-10 pl-2 pr-3 hover:bg-white/[0.06] press"
+                title={`Signed in as ${userEmail} — manage password`}
               >
                 <span className="h-7 w-7 bg-bg text-ink grid place-items-center text-[11px] font-semibold uppercase">
                   {initial}
@@ -52,11 +53,18 @@ export function Topbar({
                 <span className="text-xs max-w-[200px] truncate text-bg/70">
                   {userEmail}
                 </span>
-              </span>
-              <Button type="submit" variant="outline" size="sm" className="border-bg/20 bg-bg/0 text-bg hover:bg-bg/10 hover:border-bg/30">
-                Sign out
-              </Button>
-            </form>
+              </Link>
+              <form action="/api/auth/logout" method="post">
+                <Button
+                  type="submit"
+                  variant="outline"
+                  size="sm"
+                  className="border-bg/20 bg-bg/0 text-bg hover:bg-bg/10 hover:border-bg/30"
+                >
+                  Sign out
+                </Button>
+              </form>
+            </>
           ) : null}
         </div>
       </div>

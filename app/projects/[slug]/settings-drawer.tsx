@@ -253,13 +253,7 @@ function MembersSection({
 
       <div className="surface divide-y divide-line mb-3">
         {members.map((m) => (
-          <div key={m.id} className="p-3 flex items-center justify-between text-sm">
-            <div className="min-w-0">
-              <p className="font-medium truncate">{m.user.name ?? m.user.email}</p>
-              <p className="text-[11px] text-muted truncate">{m.user.email}</p>
-            </div>
-            <span className="text-[11px] text-muted flex-shrink-0">{m.role}</span>
-          </div>
+          <MemberRow key={m.id} projectId={projectId} member={m} />
         ))}
       </div>
 
@@ -308,6 +302,87 @@ function MembersSection({
 }
 
 // ─── Share links ──────────────────────────────────────────────────────────
+
+// Individual member row with inline admin actions. "Send reset" mails a
+// fresh password-reset magic link; "Revoke" removes them from the project.
+// Both no-op self-actions (can't revoke yourself) per the API contract.
+function MemberRow({ projectId, member }: { projectId: string; member: Member }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState<"reset" | "revoke" | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  async function sendReset() {
+    setBusy("reset");
+    setFeedback(null);
+    try {
+      const res = await fetch(
+        `/api/projects/${projectId}/members/${member.id}/send-reset`,
+        { method: "POST" }
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? "Failed");
+      }
+      setFeedback("Reset link sent");
+      setTimeout(() => setFeedback(null), 3000);
+    } catch (err: unknown) {
+      setFeedback(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function revoke() {
+    if (!confirm(`Revoke access for ${member.user.email}?`)) return;
+    setBusy("revoke");
+    try {
+      const res = await fetch(`/api/projects/${projectId}/members/${member.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? "Failed");
+      }
+      router.refresh();
+    } catch (err: unknown) {
+      setFeedback(err instanceof Error ? err.message : "Failed");
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="p-3 flex items-center justify-between gap-3 text-sm">
+      <div className="min-w-0 flex-1">
+        <p className="font-medium truncate">{member.user.name ?? member.user.email}</p>
+        <p className="text-[11px] text-muted truncate">{member.user.email}</p>
+        {feedback ? (
+          <p className="text-[11px] text-status-approved mt-1">{feedback}</p>
+        ) : null}
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <span className="text-[11px] text-muted">{member.role.replace(/_/g, " ")}</span>
+        <button
+          type="button"
+          onClick={sendReset}
+          disabled={busy !== null}
+          className="text-[11px] text-muted hover:text-ink underline underline-offset-4 disabled:opacity-50"
+          title="Email a password-reset link"
+        >
+          {busy === "reset" ? "Sending…" : "Reset"}
+        </button>
+        <button
+          type="button"
+          onClick={revoke}
+          disabled={busy !== null}
+          className="text-[11px] text-status-revision hover:opacity-80 underline underline-offset-4 disabled:opacity-50"
+          title="Remove this member's project access"
+        >
+          {busy === "revoke" ? "…" : "Revoke"}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 type ShareLinkInfo = {
   id: string;

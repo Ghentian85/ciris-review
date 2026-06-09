@@ -22,11 +22,15 @@ datasource db {
 // ---------- Identity ----------
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  avatarUrl String?
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  avatarUrl    String?
+  // bcrypt hash. Null means the user has only ever used magic-link sign-in
+  // (a fresh invite, a notification email click, etc.) and hasn't set a
+  // password yet. /login lets them sign in either way.
+  passwordHash String?
+  createdAt    DateTime @default(now())
 
   memberships    OrganizationMember[]
   projectMembers ProjectMember[]
