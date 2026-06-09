@@ -1,5 +1,10 @@
 import { Screenshot } from "./screenshot";
 
+// Master switch: hide the placeholder SVGs until real screenshots land in
+// /public/help/. Flip to true once the PNG files are in place — every step
+// already has a `screenshot` prop with the right filename baked in.
+const SHOW_SCREENSHOTS = false;
+
 // A numbered step with title, body, and optional screenshot. Stacked in a
 // vertical list — number sits in a square next to the title, body and
 // screenshot flow underneath.
@@ -27,7 +32,7 @@ export function Step({
           <div className="text-[15px] text-ink-soft leading-relaxed [&>p]:mb-3 [&>ul]:my-3 [&>ul]:pl-5 [&>ul]:list-disc [&>ul>li]:mb-1.5 [&_strong]:font-medium [&_strong]:text-ink [&_code]:bg-line-soft [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:text-[13px] [&_code]:font-medium [&_code]:text-ink">
             {children}
           </div>
-          {screenshot ? (
+          {SHOW_SCREENSHOTS && screenshot ? (
             <Screenshot
               src={screenshot.src}
               alt={screenshot.alt}
