@@ -2,29 +2,36 @@ import { redirect } from "next/navigation";
 import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { createSession, destroySession, getCurrentUser } from "@/lib/auth";
+import {
+  createLoginToken,
+  destroySession,
+  getCurrentUser,
+} from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/app/logo";
 
-// Strongly-typed shape for the invite we hand to acceptAndRedirect — keeps
-// the helper independent of how the lookup query is written upstream.
+// Strongly-typed shape so the accept helper is independent of how the
+// page's lookup query is written upstream.
 type InviteWithProject = Prisma.InviteGetPayload<{
   include: { project: { include: { client: true; organization: true } } };
 }>;
 
 // Project invite — one-click access.
 //
-// The token embedded in the URL IS the secret. Anyone holding this URL is
-// trusted to be the invited recipient (same security model as a magic
-// link). Clicking the invite from email therefore both signs you in AND
-// adds you to the project — no second email round-trip.
+// The token in the URL is the secret (same trust model as a magic link).
+// Clicking the invite both signs the recipient in AND adds them to the
+// project — no second email round-trip.
+//
+// IMPORTANT (Next.js 15): Server Components can read cookies but can't
+// SET them. To set the session cookie we mint a fresh login-token and
+// redirect to /api/auth/verify (a Route Handler) which sets the cookie
+// and then redirects to `next`. The page handles everything except the
+// final session write.
 //
 // Three branches:
-//   1. Not signed in            → auto sign in as invite.email, accept, go
-//   2. Signed in, matching email → accept, go
-//   3. Signed in, different email → render a "switch to <email>" button.
-//      Edge case (shared computer, admin testing); confirms intent before
-//      we replace the current session.
+//   1. Not signed in            → mint login-token, accept, redirect via verify
+//   2. Signed in, matching email → accept, redirect (no new session needed)
+//   3. Signed in, different email → show switch-account confirmation
 export default async function InviteAccept({
   params,
 }: {
@@ -91,26 +98,43 @@ export default async function InviteAccept({
   );
 }
 
-// Shared accept path: upsert the User (if first-time), create a session,
-// attach project + org membership, mark the invite consumed, redirect.
-// `existingUserId` lets us skip the user upsert + session create when the
-// signed-in user already matches the invite — keeps that branch cheap.
+// Shared accept path. Two flavors based on whether we already have a
+// matching session: if yes, just write membership and redirect; if no,
+// mint a login token and detour through /api/auth/verify so the Route
+// Handler can set the session cookie (Server Components can't).
 async function acceptAndRedirect(
   invite: InviteWithProject,
   existingUserId: string | null
 ) {
-  let userId = existingUserId;
-  let isFreshUser = false;
-  if (!userId) {
-    const user = await prisma.user.upsert({
-      where: { email: invite.email },
-      update: {},
-      create: { email: invite.email },
-    });
-    userId = user.id;
-    isFreshUser = !user.passwordHash;
-    await createSession(userId);
+  const projectPath = `/projects/${invite.project.slug}`;
+
+  if (existingUserId) {
+    // Already signed in with the matching email — no cookie work needed.
+    await writeMembership(invite, existingUserId);
+    redirect(projectPath);
   }
+
+  // Fresh / mismatched session: mint a one-shot login token for the
+  // invite email, write membership now, then redirect to verify which
+  // sets the cookie and forwards to `next`. Fresh users (no password
+  // yet) get nudged through the welcome password page; returning users
+  // go straight to the project.
+  const { user, raw } = await createLoginToken(invite.email);
+  await writeMembership(invite, user.id);
+
+  const isFreshUser = !user.passwordHash;
+  const next = isFreshUser
+    ? `/account/password?welcome=1&continue=${encodeURIComponent(projectPath)}`
+    : projectPath;
+
+  redirect(
+    `/api/auth/verify?token=${encodeURIComponent(raw)}&next=${encodeURIComponent(next)}`
+  );
+}
+
+// Idempotent membership writes — safe to call multiple times if the user
+// retries the invite link before the redirect lands.
+async function writeMembership(invite: InviteWithProject, userId: string) {
   await prisma.projectMember.upsert({
     where: { projectId_userId: { projectId: invite.projectId, userId } },
     create: {
@@ -123,25 +147,13 @@ async function acceptAndRedirect(
   });
   await prisma.organizationMember.upsert({
     where: { orgId_userId: { orgId: invite.project.orgId, userId } },
-    create: {
-      orgId: invite.project.orgId,
-      userId,
-      role: "internal",
-    },
+    create: { orgId: invite.project.orgId, userId, role: "internal" },
     update: {},
   });
   await prisma.invite.update({
     where: { id: invite.id },
     data: { acceptedAt: new Date() },
   });
-  // For fresh users (no passwordHash yet) detour through the welcome
-  // password page so they're prompted once to set a password — they can
-  // skip it and land on the project anyway. Returning users go direct.
-  const projectPath = `/projects/${invite.project.slug}`;
-  if (isFreshUser) {
-    redirect(`/account/password?welcome=1&continue=${encodeURIComponent(projectPath)}`);
-  }
-  redirect(projectPath);
 }
 
 function BlockedScreen({ body }: { body: string }) {
