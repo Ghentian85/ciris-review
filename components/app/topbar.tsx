@@ -36,6 +36,7 @@ export function Topbar({
           <NavLink href="/">Projects</NavLink>
           <NavLink href="/work">Work</NavLink>
           {isAdmin ? <NavLink href="/admin">Admin</NavLink> : null}
+          <NavLink href="/help">Help</NavLink>
         </nav>
 
         {/* ── Right: account (square avatar → /account/password) ──── */}
