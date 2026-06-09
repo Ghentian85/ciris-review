@@ -1,6 +1,7 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -182,7 +183,16 @@ function GeneralSection({
           <span>
             Watermark preview tier
             <span className="block text-[11px] text-muted mt-0.5">
-              Adds a faint "PREVIEW" overlay on review-tier images. Originals stay untouched.
+              Adds a faint &quot;PREVIEW&quot; overlay on review-tier images. Applies to{" "}
+              <strong>future uploads only</strong> — to remove a baked-in watermark from
+              existing images,{" "}
+              <Link
+                href={`/projects/${project.slug}/refresh-previews`}
+                className="underline underline-offset-4 hover:text-ink"
+              >
+                refresh their previews
+              </Link>
+              .
             </span>
           </span>
         </label>
