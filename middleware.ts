@@ -40,6 +40,14 @@ export function middleware(req: NextRequest) {
   const cookie = req.cookies.get("ciris_review_session")?.value;
   if (!cookie) {
     const url = new URL("/login", req.url);
+    // Preserve the original target as ?next= so the user lands where they
+    // tried to go after signing in. Skip noise like raw "/" and never
+    // forward absolute / protocol-relative URLs (defense-in-depth — verify
+    // already guards open redirects, but keeping it tight here too).
+    const target = req.nextUrl.pathname + req.nextUrl.search;
+    if (target !== "/" && target.startsWith("/") && !target.startsWith("//")) {
+      url.searchParams.set("next", target);
+    }
     return NextResponse.redirect(url);
   }
   return NextResponse.next();

@@ -7,6 +7,10 @@ import { env } from "@/lib/env";
 const schema = z.object({
   email: z.string().email(),
   name: z.string().min(1).max(120).optional(),
+  // Optional path to send the user to after the magic-link verifies.
+  // Same internal-only guard as on /api/auth/verify — embed it raw and
+  // let verify validate, that way one open-redirect check stays canonical.
+  next: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -16,7 +20,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
   const { user, raw } = await createLoginToken(parsed.data.email, parsed.data.name);
-  const url = `${env.APP_URL}/api/auth/verify?token=${encodeURIComponent(raw)}`;
+
+  const verifyUrl = new URL("/api/auth/verify", env.APP_URL);
+  verifyUrl.searchParams.set("token", raw);
+  if (parsed.data.next) verifyUrl.searchParams.set("next", parsed.data.next);
+  const url = verifyUrl.toString();
+
   const tpl = magicLinkEmail(url);
   const result = await sendEmail({ to: user.email, ...tpl });
 

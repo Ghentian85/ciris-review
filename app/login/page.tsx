@@ -63,7 +63,14 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name: name || undefined }),
+        body: JSON.stringify({
+          email,
+          name: name || undefined,
+          // Forward ?next= so the magic link lands the user on the page
+          // they were trying to reach — works the same as password
+          // sign-in's router.push(next) after a successful POST.
+          next: next !== "/" ? next : undefined,
+        }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({ error: "Failed" }));
