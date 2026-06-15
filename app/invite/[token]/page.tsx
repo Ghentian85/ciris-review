@@ -6,7 +6,10 @@ import {
   createLoginToken,
   destroySession,
   getCurrentUser,
+  mintSignInUrl,
 } from "@/lib/auth";
+import { sendEmail, magicLinkEmail } from "@/lib/email";
+import { env } from "@/lib/env";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/app/logo";
 
@@ -16,22 +19,21 @@ type InviteWithProject = Prisma.InviteGetPayload<{
   include: { project: { include: { client: true; organization: true } } };
 }>;
 
-// Project invite — one-click access.
+// Project invite — one-click access (with an interstitial confirm step).
 //
-// The token in the URL is the secret (same trust model as a magic link).
-// Clicking the invite both signs the recipient in AND adds them to the
-// project — no second email round-trip.
+// Email security scanners (Defender, Mimecast, Google Safe Browsing, etc.)
+// follow every URL in a received email to scan for malware. That auto-GET
+// would otherwise consume a single-use invite token before the recipient
+// clicks. To guard against it:
 //
-// IMPORTANT (Next.js 15): Server Components can read cookies but can't
-// SET them. To set the session cookie we mint a fresh login-token and
-// redirect to /api/auth/verify (a Route Handler) which sets the cookie
-// and then redirects to `next`. The page handles everything except the
-// final session write.
+//   - GET only RENDERS a confirm page (no DB writes)
+//   - The "Continue" button POSTs a server action that does the actual
+//     accept + redirect. Scanners don't click buttons.
 //
-// Three branches:
-//   1. Not signed in            → mint login-token, accept, redirect via verify
-//   2. Signed in, matching email → accept, redirect (no new session needed)
-//   3. Signed in, different email → show switch-account confirmation
+// IMPORTANT (Next.js 15): cookies().set() doesn't follow onto a redirect
+// from a Server Component. We mint a fresh login token here and bounce
+// through /api/auth/verify (a Route Handler that CAN set cookies) for
+// the session write.
 export default async function InviteAccept({
   params,
 }: {
@@ -45,23 +47,63 @@ export default async function InviteAccept({
     include: { project: { include: { client: true, organization: true } } },
   });
 
-  if (!invite || invite.expiresAt < new Date() || invite.acceptedAt) {
-    return <BlockedScreen body="This invite has expired or has already been used." />;
+  // Invite missing entirely → completely unknown link.
+  if (!invite) {
+    return <BlockedScreen body="This invite link is invalid." />;
+  }
+
+  if (invite.expiresAt < new Date()) {
+    return (
+      <BlockedScreen
+        body={`This invite expired on ${invite.expiresAt.toLocaleDateString()}. Ask whoever sent it for a new one.`}
+      />
+    );
+  }
+
+  // Already consumed → most likely by an email scanner. Offer the
+  // recipient a magic-link sign-in for their address; if they were
+  // successfully added to the project on the first (scanner) visit, the
+  // magic-link will land them in the project just fine.
+  if (invite.acceptedAt) {
+    async function sendSignInLink() {
+      "use server";
+      const url = await mintSignInUrl({
+        baseUrl: env.APP_URL,
+        email: invite!.email,
+        nextPath: `/projects/${invite!.project.slug}`,
+      });
+      await sendEmail({ to: invite!.email, ...magicLinkEmail(url) });
+    }
+    return (
+      <AlreadyAcceptedScreen
+        email={invite.email}
+        projectName={invite.project.name}
+        action={sendSignInLink}
+      />
+    );
   }
 
   const currentUser = await getCurrentUser();
 
-  // Branches 1 & 2 → accept silently and redirect.
-  if (!currentUser || currentUser.email === invite.email) {
-    await acceptAndRedirect(invite, currentUser?.id ?? null);
+  // Already signed in with the matching email → no scanner risk for THIS
+  // path (we're not in an email click, we're in the app). Accept directly.
+  if (currentUser && currentUser.email === invite.email) {
+    await acceptAndRedirect(invite, currentUser.id);
   }
 
-  // Branch 3 → confirm session switch.
+  // Server actions for the two non-matching branches.
+  async function acceptAnonymous() {
+    "use server";
+    await acceptAndRedirect(invite!, null);
+  }
   async function switchAccount() {
     "use server";
     await destroySession();
     await acceptAndRedirect(invite!, null);
   }
+
+  const mismatch = currentUser && currentUser.email !== invite.email;
+  const roleLabel = invite.role.replace(/_/g, " ");
 
   return (
     <main className="min-h-screen grid place-items-center p-6 animate-rise">
@@ -75,23 +117,44 @@ export default async function InviteAccept({
         <div className="surface p-8">
           <p className="text-[11px] uppercase tracking-[0.18em] text-muted mb-3 flex items-center justify-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-            Project invite
+            {invite.project.organization.name}
           </p>
           <h1 className="font-display text-[24px] tracking-tight leading-tight">
             {invite.project.name}
           </h1>
           <p className="text-sm text-muted mt-3">
-            You&apos;re signed in as <span className="font-medium text-ink">{currentUser!.email}</span>,
-            but this invite is for <span className="font-medium text-ink">{invite.email}</span>.
+            You&apos;re invited as <strong className="text-ink">{roleLabel}</strong>.
           </p>
-          <form action={switchAccount} className="mt-6">
-            <Button type="submit" className="w-full h-11">
-              Sign in as {invite.email}
-            </Button>
-          </form>
-          <p className="text-[11px] text-muted-soft mt-4">
-            Continuing will sign out your current session.
-          </p>
+
+          {mismatch ? (
+            <>
+              <p className="text-sm text-muted mt-3">
+                You&apos;re signed in as{" "}
+                <span className="font-medium text-ink">{currentUser!.email}</span>,
+                but this invite is for{" "}
+                <span className="font-medium text-ink">{invite.email}</span>.
+              </p>
+              <form action={switchAccount} className="mt-6">
+                <Button type="submit" className="w-full h-11">
+                  Sign in as {invite.email}
+                </Button>
+              </form>
+              <p className="text-[11px] text-muted-soft mt-4">
+                Continuing will sign out your current session.
+              </p>
+            </>
+          ) : (
+            <>
+              <form action={acceptAnonymous} className="mt-6">
+                <Button type="submit" className="w-full h-11">
+                  Continue as {invite.email}
+                </Button>
+              </form>
+              <p className="text-[11px] text-muted-soft mt-4">
+                Clicking continues to the project. Link is single-use.
+              </p>
+            </>
+          )}
         </div>
       </div>
     </main>
@@ -109,16 +172,10 @@ async function acceptAndRedirect(
   const projectPath = `/projects/${invite.project.slug}`;
 
   if (existingUserId) {
-    // Already signed in with the matching email — no cookie work needed.
     await writeMembership(invite, existingUserId);
     redirect(projectPath);
   }
 
-  // Fresh / mismatched session: mint a one-shot login token for the
-  // invite email, write membership now, then redirect to verify which
-  // sets the cookie and forwards to `next`. Fresh users (no password
-  // yet) get nudged through the welcome password page; returning users
-  // go straight to the project.
   const { user, raw } = await createLoginToken(invite.email);
   await writeMembership(invite, user.id);
 
@@ -172,6 +229,55 @@ function BlockedScreen({ body }: { body: string }) {
           </div>
           <h1 className="font-medium text-base">Invitation unavailable</h1>
           <p className="text-sm text-muted mt-2 leading-relaxed">{body}</p>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+// "Already accepted" screen. Most common cause: an email security scanner
+// followed the link before the human did. We offer a magic-link sign-in
+// instead — the user is already a project member from the scanner's auto-
+// visit, so the magic-link drops them straight into the project.
+function AlreadyAcceptedScreen({
+  email,
+  projectName,
+  action,
+}: {
+  email: string;
+  projectName: string;
+  action: () => Promise<void>;
+}) {
+  return (
+    <main className="min-h-screen grid place-items-center p-6 animate-rise">
+      <div className="w-full max-w-md text-center">
+        <div className="mb-8 text-ink">
+          <Logo className="h-7 w-auto mx-auto" />
+          <p className="text-[10px] text-muted tracking-[0.28em] uppercase mt-3 font-medium">
+            Review
+          </p>
+        </div>
+        <div className="surface p-8">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-muted mb-3 flex items-center justify-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-status-notes" />
+            Link already used
+          </p>
+          <h1 className="font-display text-[22px] tracking-tight leading-tight">
+            {projectName}
+          </h1>
+          <p className="text-sm text-muted mt-3 leading-relaxed">
+            This invite was already opened — sometimes an email scanner does this
+            before you click. No problem: we&apos;ll send a fresh sign-in link to{" "}
+            <strong className="text-ink">{email}</strong>.
+          </p>
+          <form action={action} className="mt-6">
+            <Button type="submit" className="w-full h-11">
+              Email me a sign-in link
+            </Button>
+          </form>
+          <p className="text-[11px] text-muted-soft mt-4">
+            Already added to the project — the link drops you straight in.
+          </p>
         </div>
       </div>
     </main>
