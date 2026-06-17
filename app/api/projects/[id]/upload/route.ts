@@ -96,14 +96,17 @@ async function uploadHandler(
     typeof slotName === "string" && slotName.trim() ? `${slotName.trim()}.x` : file.name
   );
 
-  // V2 mode: look for an existing Image in this gallery whose slotName matches.
-  // Matching uses exact slotName equality. If the post-prod team renamed files
-  // they'll need to fix it on disk before uploading.
-  if (mode === "v2") {
-    const existing = await prisma.image.findFirst({
-      where: { galleryId, slotName: parsed.slotName, killed: false },
-      include: { currentVersion: true },
-    });
+  // Even in V1 mode, check if a slot already exists — Sam (and others)
+  // routinely forget the V2 toggle when uploading revisions, which created
+  // ghost duplicate Image rows that polluted the sibling-views grid. The
+  // safe default: if a slot already exists in this gallery, treat the
+  // upload as a new version (V2/V3/...) of that image. The toggle becomes
+  // purely informational.
+  const existing = await prisma.image.findFirst({
+    where: { galleryId, slotName: parsed.slotName, killed: false },
+    include: { currentVersion: true },
+  });
+  if (mode === "v2" || existing) {
     if (existing) {
       const nextVersionNumber = (existing.currentVersion?.versionNumber ?? 0) + 1;
       const stored = await storeImageVersion({
