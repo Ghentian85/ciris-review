@@ -9,9 +9,10 @@ import { cn } from "@/lib/utils";
 type UploadItem = {
   id: string;
   file: File;
-  status: "queued" | "uploading" | "done" | "error";
+  status: "queued" | "uploading" | "done" | "skipped" | "error";
   progress: number;
   error?: string;
+  skipReason?: string;
 };
 
 const CONCURRENCY = 4;
@@ -54,8 +55,9 @@ export function UploadClient({
 
   const totals = useMemo(() => {
     const done = items.filter((i) => i.status === "done").length;
+    const skipped = items.filter((i) => i.status === "skipped").length;
     const err = items.filter((i) => i.status === "error").length;
-    return { done, err, total: items.length };
+    return { done, skipped, err, total: items.length };
   }, [items]);
 
   async function uploadOne(item: UploadItem): Promise<void> {
@@ -75,9 +77,25 @@ export function UploadClient({
       };
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
+          // Server may respond 200 with { skipped: true } when a slot
+          // already exists and we're in v1 mode — surface it as its own
+          // status so the user sees at a glance which files were dropped.
+          let skipped = false;
+          let skipReason: string | undefined;
+          try {
+            const body = JSON.parse(xhr.responseText) as { skipped?: boolean; reason?: string };
+            if (body.skipped) {
+              skipped = true;
+              skipReason = body.reason;
+            }
+          } catch {}
           setItems((cur) =>
             cur.map((i) =>
-              i.id === item.id ? { ...i, status: "done", progress: 100 } : i
+              i.id === item.id
+                ? skipped
+                  ? { ...i, status: "skipped", progress: 100, skipReason }
+                  : { ...i, status: "done", progress: 100 }
+                : i
             )
           );
         } else {
@@ -148,7 +166,7 @@ export function UploadClient({
           >
             <p className="text-sm font-medium">New images (V1)</p>
             <p className="text-xs text-muted mt-0.5">
-              Each file becomes a new image in the project.
+              Only new slots are uploaded. Files matching existing slots are skipped.
             </p>
           </button>
           <button
@@ -205,7 +223,9 @@ export function UploadClient({
             <p className="text-sm">
               {items.length} file{items.length === 1 ? "" : "s"} ·{" "}
               <span className="text-muted">
-                {totals.done} done{totals.err ? ` · ${totals.err} failed` : ""}
+                {totals.done} done
+                {totals.skipped ? ` · ${totals.skipped} skipped` : ""}
+                {totals.err ? ` · ${totals.err} failed` : ""}
               </span>
             </p>
             <div className="flex items-center gap-2">
@@ -244,6 +264,10 @@ export function UploadClient({
                     <span className="text-status-v2">{i.progress}%</span>
                   ) : i.status === "done" ? (
                     <span className="text-status-approved">done</span>
+                  ) : i.status === "skipped" ? (
+                    <span className="text-muted-soft" title={i.skipReason}>
+                      skipped
+                    </span>
                   ) : (
                     <span className="text-status-revision" title={i.error}>
                       failed

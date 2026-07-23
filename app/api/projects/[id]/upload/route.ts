@@ -96,17 +96,29 @@ async function uploadHandler(
     typeof slotName === "string" && slotName.trim() ? `${slotName.trim()}.x` : file.name
   );
 
-  // Even in V1 mode, check if a slot already exists — Sam (and others)
-  // routinely forget the V2 toggle when uploading revisions, which created
-  // ghost duplicate Image rows that polluted the sibling-views grid. The
-  // safe default: if a slot already exists in this gallery, treat the
-  // upload as a new version (V2/V3/...) of that image. The toggle becomes
-  // purely informational.
+  // Two mode contract:
+  //   v1 — only create when the slot is new. If a slot already exists we
+  //        return { skipped: true } so the client can show a grey "skipped"
+  //        row instead of silently duplicating the image. Fixes the ghost-
+  //        duplicate class of bugs where a batch drop mixed new files with
+  //        already-uploaded ones.
+  //   v2 — match slot to an existing image and append a fresh version.
+  //        Unknown slots fall through to v1 (create new) — deliberate, so
+  //        a mixed batch in v2 mode doesn't silently drop new files.
   const existing = await prisma.image.findFirst({
     where: { galleryId, slotName: parsed.slotName, killed: false },
     include: { currentVersion: true },
   });
-  if (mode === "v2" || existing) {
+  if (mode === "v1" && existing) {
+    return NextResponse.json({
+      id: existing.id,
+      slot: existing.slotName,
+      matched: false,
+      skipped: true,
+      reason: "Slot already exists — switch to Revisions mode to add as a new version.",
+    });
+  }
+  if (mode === "v2") {
     if (existing) {
       const nextVersionNumber = (existing.currentVersion?.versionNumber ?? 0) + 1;
       const stored = await storeImageVersion({
