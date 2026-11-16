@@ -38,6 +38,16 @@ const TAB_LABELS: Record<TabKey, string> = {
   revision: "Needs revision",
 };
 
+// Same mapping as the project overview — any change here should land
+// in app/projects/[slug]/page.tsx too so the two stay in lock-step.
+function statusToTab(status: string): TabKey | null {
+  if (status === "pending") return "pending";
+  if (status === "approved" || status === "approved_with_notes" || status === "final")
+    return "approved";
+  if (status === "revision_requested") return "revision";
+  return null;
+}
+
 export default async function ImageDetailPage({
   params,
   searchParams,
@@ -80,7 +90,17 @@ export default async function ImageDetailPage({
   const navigable = gallery.images.filter(
     (i) => !i.killed && i.currentVersionId !== null
   );
-  const sorted = sortImages(navigable);
+
+  // When the user came from a specific overview tab ("Still to review",
+  // "Approved", "Needs revision"), keep prev/next within that tab so they
+  // don't accidentally scroll past images they've already decided on.
+  // The current image is always included — even if its status just moved
+  // out of the tab (e.g. they approved it a second ago) — so the page
+  // itself stays reachable; prev/next just skip it on the way out.
+  const tabScoped = fromOverview
+    ? navigable.filter((i) => statusToTab(i.status) === tab || i.id === imageId)
+    : navigable;
+  const sorted = sortImages(tabScoped);
   const idx = sorted.findIndex((i) => i.id === imageId);
   if (idx === -1) notFound();
 
