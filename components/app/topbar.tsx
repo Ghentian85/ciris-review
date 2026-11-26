@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { NavLink } from "./nav-link";
-import { Logo } from "./logo";
+import { BrandLogo } from "./brand-logo";
+import type { BrandProps } from "./site-frame";
 
 // Three-zone layout: logo left, primary nav perfectly centered, account
 // actions right. Grid with 1fr / auto / 1fr keeps center cell centered
@@ -9,23 +10,26 @@ import { Logo } from "./logo";
 export function Topbar({
   userEmail,
   isAdmin,
+  brand,
 }: {
   userEmail?: string;
   // Owner / admin org-members get the Admin link. Resolved server-side in
   // the root layout so the topbar stays a thin presentational component.
   isAdmin?: boolean;
+  brand: BrandProps;
 }) {
   const initial = userEmail?.[0]?.toUpperCase() ?? "·";
+  const brandName = brand.displayName ?? "CIRIS";
   return (
     <header className="sticky top-0 z-30 bg-ink/95 backdrop-blur-md text-bg shadow-pop">
       <div className="mx-auto max-w-7xl px-5 h-16 grid grid-cols-[1fr_auto_1fr] items-center gap-6">
-        {/* ── Left: logo (pure white, square hit area) ─────── */}
+        {/* ── Left: logo (brand-aware) ─────────────────────── */}
         <Link
           href="/"
           className="justify-self-start inline-flex items-center gap-3 h-10 pl-1 pr-3 hover:bg-white/[0.06] press text-white"
-          aria-label="CIRIS Review home"
+          aria-label={`${brandName} Review home`}
         >
-          <Logo />
+          <BrandLogo logoUrl={brand.logoUrl} alt={brandName} />
           <span className="hidden sm:inline text-[10px] tracking-[0.28em] uppercase font-medium opacity-60 border-l border-white/20 pl-3 ml-1">
             Review
           </span>

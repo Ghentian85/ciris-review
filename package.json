@@ -11,6 +11,7 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "seed:demo-roles": "tsx scripts/seed-demo-roles.ts",
+    "seed:studio360": "tsx scripts/seed-studio360.ts",
     "db:use-sqlite": "node scripts/swap-db-provider.mjs sqlite",
     "db:use-postgres": "node scripts/swap-db-provider.mjs postgresql",
     "db:push-prod": "node scripts/db-push-prod.mjs",

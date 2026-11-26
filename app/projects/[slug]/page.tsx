@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
 import { SubmitRoundButton } from "./submit-round-button";
 import { NotifyClientButton } from "./notify-client-button";
+import { ReleaseToClientButton } from "./release-to-client-button";
 import { SettingsDrawer } from "./settings-drawer";
 import { ImageGridWithBulk, type GridImg } from "./image-grid-with-bulk";
 
@@ -41,6 +42,7 @@ export default async function ProjectOverview({
     where: { orgId: membership.orgId, slug },
     include: {
       client: true,
+      organization: { select: { studioMode: true } },
       members: { include: { user: true } },
       rounds: { orderBy: { number: "asc" } },
     },
@@ -52,6 +54,11 @@ export default async function ProjectOverview({
   const isClient = role === "client_reviewer";
   const isOrgOwner = membership.role === "owner";
   const isOrgAdminRole = membership.role === "owner" || membership.role === "admin";
+  // Studio mode: client reviewers only see images that were explicitly
+  // released. Admin / internal see everything (released + still in internal
+  // review). On non-studio orgs this flag is false and the filter is a no-op.
+  const studioMode = project.organization.studioMode;
+  const hideUnreleasedFromClient = studioMode && isClient;
 
   // All images in the project, sorted for stable display. Excludes killed
   // images and orphans (no currentVersion — e.g. an upload that crashed in
@@ -62,6 +69,7 @@ export default async function ProjectOverview({
       gallery: { projectId: project.id },
       killed: false,
       currentVersionId: { not: null },
+      ...(hideUnreleasedFromClient ? { releasedAt: { not: null } } : {}),
     },
     include: {
       currentVersion: {
@@ -76,6 +84,20 @@ export default async function ProjectOverview({
     },
     orderBy: [{ gallery: { position: "asc" } }, { slotName: "asc" }],
   });
+
+  // Count how many images are sitting in the internal-review tier (never
+  // released). Only meaningful in studioMode. Admins see this to know when
+  // to press "Release to client".
+  const unreleasedCount = studioMode
+    ? await prisma.image.count({
+        where: {
+          gallery: { projectId: project.id },
+          killed: false,
+          currentVersionId: { not: null },
+          releasedAt: null,
+        },
+      })
+    : 0;
 
   const counts = { pending: 0, approved: 0, revision: 0 };
   for (const img of images) {
@@ -121,6 +143,17 @@ export default async function ProjectOverview({
             <p className="text-[11px] uppercase tracking-[0.18em] text-muted mb-3 flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-accent" />
               {project.client?.name ?? "Internal"}
+              {project.client && !isClient ? (
+                <>
+                  <span className="text-muted-soft">·</span>
+                  <Link
+                    href={`/clients/${project.client.id}/packshot-id`}
+                    className="text-muted hover:text-ink underline underline-offset-4 normal-case tracking-normal"
+                  >
+                    Packshot ID
+                  </Link>
+                </>
+              ) : null}
             </p>
             <h1 className="text-[34px] md:text-[44px] font-display font-medium tracking-tight leading-[1.05]">
               {project.name}
@@ -152,6 +185,12 @@ export default async function ProjectOverview({
               <Button asChild>
                 <Link href={`/projects/${project.slug}/upload`}>Upload images</Link>
               </Button>
+              {studioMode && unreleasedCount > 0 ? (
+                <ReleaseToClientButton
+                  projectId={project.id}
+                  count={unreleasedCount}
+                />
+              ) : null}
               {draftReady > 0 && currentRound ? (
                 <NotifyClientButton
                   projectId={project.id}

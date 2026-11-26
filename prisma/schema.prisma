@@ -58,12 +58,12 @@ model Session {
 }
 
 model LoginToken {
-  id        String   @id @default(cuid())
-  userId    String
-  tokenHash String   @unique
-  expiresAt DateTime
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
   consumedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -79,6 +79,23 @@ model Organization {
   plan      String   @default("free")
   createdAt DateTime @default(now())
 
+  // ── White-label (multi-tenant support) ──────────────────────────────
+  // Each org can own a hostname; middleware uses it to pick the right
+  // org context for an incoming request. Null means the org isn't
+  // publicly routable (private / admin-created).
+  hostname       String? @unique
+  // Friendly brand name shown in UI (falls back to `name` if null)
+  displayName    String?
+  // Logo URL — either /public/orgs/<slug>.svg or an external URL
+  logoUrl        String?
+  // Hex color for brand accent (coral tone fallback if null)
+  brandAccent    String?
+  // Show "powered by CIRIS" footer across their surfaces
+  poweredByCiris Boolean @default(false)
+  // When true, an internal review tier is required before client eyes.
+  // Flags the extra "release to client" step on the project overview.
+  studioMode     Boolean @default(false)
+
   members  OrganizationMember[]
   clients  Client[]
   projects Project[]
@@ -86,11 +103,11 @@ model Organization {
 }
 
 model OrganizationMember {
-  id      String @id @default(cuid())
-  orgId   String
-  userId  String
+  id        String   @id @default(cuid())
+  orgId     String
+  userId    String
   // owner | admin | internal | post_prod
-  role    String @default("internal")
+  role      String   @default("internal")
   createdAt DateTime @default(now())
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -109,29 +126,59 @@ model Client {
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   projects     Project[]
+  packshotId   PackshotId?
 
   @@index([orgId])
+}
+
+// One-to-one styling + technical brief per client. Rendered to PDF so the
+// studio floor can consult it before each shoot. Stored as plain-text
+// sections — the PDF renderer wraps them in a branded template. All
+// sections are optional so you can fill in what applies.
+model PackshotId {
+  id              String   @id @default(cuid())
+  clientId        String   @unique
+  // Who they are
+  brandBlurb      String? // About the brand — what they do, who they are
+  audience        String? // Target audience
+  // Styling (per-item fitting choices)
+  stylingNotes    String? // Bows tied, laces laced, buttons, sleeve width…
+  fitNotes        String? // How tight / how loose the pieces are styled
+  // Technical (camera + light + colour)
+  cameraNotes     String? // Angles, focal lengths, standpunten
+  lightingNotes   String? // Light setup
+  shadowNotes     String? // Shadow handling
+  colourNotes     String? // Warmth, colour targets (e.g. diamond tone)
+  // Finishing (post + delivery)
+  formatNotes     String? // Deliverable formats
+  whitespaceNotes String? // Canvas whitespace rules
+  deliverySpecs   String? // Delivery specs (file type, size, naming)
+  updatedAt       DateTime @updatedAt
+  updatedById     String?
+  createdAt       DateTime @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 
 // ---------- Project graph ----------
 
 model Project {
-  id            String   @id @default(cuid())
-  orgId         String
-  clientId      String?
-  name          String
-  slug          String
+  id               String   @id @default(cuid())
+  orgId            String
+  clientId         String?
+  name             String
+  slug             String
   // draft | active | closed | archived
-  status        String   @default("active")
-  briefUrl      String?
-  coverImageId  String?
-  watermarkPreview Boolean @default(true)
-  createdById   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  status           String   @default("active")
+  briefUrl         String?
+  coverImageId     String?
+  watermarkPreview Boolean  @default(true)
+  createdById      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  organization Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  client       Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  organization Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  client       Client?         @relation(fields: [clientId], references: [id], onDelete: SetNull)
   members      ProjectMember[]
   galleries    Gallery[]
   rounds       ReviewRound[]
@@ -146,12 +193,12 @@ model Project {
 }
 
 model ProjectMember {
-  id         String @id @default(cuid())
+  id         String   @id @default(cuid())
   projectId  String
   userId     String
   // admin | internal_reviewer | client_reviewer | post_production
   role       String
-  canApprove Boolean @default(false)
+  canApprove Boolean  @default(false)
   createdAt  DateTime @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -162,15 +209,15 @@ model ProjectMember {
 }
 
 model Invite {
-  id        String   @id @default(cuid())
-  projectId String
-  email     String
-  role      String
-  tokenHash String   @unique
+  id          String    @id @default(cuid())
+  projectId   String
+  email       String
+  role        String
+  tokenHash   String    @unique
   createdById String?
-  expiresAt DateTime
-  acceptedAt DateTime?
-  createdAt DateTime @default(now())
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
 
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   createdBy User?   @relation("InviteCreator", fields: [createdById], references: [id], onDelete: SetNull)
@@ -181,12 +228,12 @@ model Invite {
 // ---------- Galleries, rounds, images, versions ----------
 
 model Gallery {
-  id        String  @id @default(cuid())
+  id        String   @id @default(cuid())
   projectId String
   name      String
   // campaign | look | product_set | batch | custom
-  kind      String  @default("custom")
-  position  Int     @default(0)
+  kind      String   @default("custom")
+  position  Int      @default(0)
   createdAt DateTime @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -196,18 +243,18 @@ model Gallery {
 }
 
 model ReviewRound {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   projectId String
   number    Int
   // draft | open | closed
-  status    String   @default("draft")
+  status    String    @default("draft")
   openedAt  DateTime?
   dueAt     DateTime?
   closedAt  DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
-  project Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  states  ImageRoundState[]
+  project  Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  states   ImageRoundState[]
   comments Comment[]
 
   @@unique([projectId, number])
@@ -215,27 +262,33 @@ model ReviewRound {
 }
 
 model Image {
-  id                String   @id @default(cuid())
-  galleryId         String
-  slotName          String   // canonical name e.g. "LOOK_03_A"
+  id               String    @id @default(cuid())
+  galleryId        String
+  slotName         String // canonical name e.g. "LOOK_03_A"
   // subject groups multiple views of the same product/look:
   //   LOOK_03_A & LOOK_03_B → subjectKey="LOOK_03", viewLabel="A" / "B"
   // Both nullable so single-view uploads still work cleanly.
-  subjectKey        String?
-  viewLabel         String?
-  filenameOriginal  String
-  displayName       String?
+  subjectKey       String?
+  viewLabel        String?
+  filenameOriginal String
+  displayName      String?
   // pending | approved | approved_with_notes | revision_requested | final
-  status            String   @default("pending")
-  position          Int      @default(0)
-  killed            Boolean  @default(false)
-  currentVersionId  String?  @unique
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  status           String    @default("pending")
+  position         Int       @default(0)
+  killed           Boolean   @default(false)
+  currentVersionId String?   @unique
+  // Studio-mode gating: when the project's org has studioMode=true, this
+  // timestamp marks when the image was released to client reviewers.
+  // Null = account-manager-only (internal review phase). Non-null = visible
+  // to everyone with project membership (including clients). On non-studio
+  // orgs this column stays null and is ignored by the client-view filter.
+  releasedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  gallery        Gallery        @relation(fields: [galleryId], references: [id], onDelete: Cascade)
-  currentVersion ImageVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
-  versions       ImageVersion[] @relation("VersionsOfImage")
+  gallery        Gallery           @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  currentVersion ImageVersion?     @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  versions       ImageVersion[]    @relation("VersionsOfImage")
   comments       Comment[]
   annotations    Annotation[]
   roundStates    ImageRoundState[]
@@ -259,37 +312,37 @@ model ImageVersion {
   height              Int      @default(0)
   mime                String   @default("image/jpeg")
   sizeBytes           Int      @default(0)
-  exif                String?  // JSON
+  exif                String? // JSON
   colorProfile        String?
   uploadedById        String?
   uploadedAt          DateTime @default(now())
 
-  image         Image          @relation("VersionsOfImage", fields: [imageId], references: [id], onDelete: Cascade)
-  uploadedBy    User?          @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
-  currentOf     Image?         @relation("CurrentVersion")
-  comments      Comment[]
-  annotations   Annotation[]
-  roundStates   ImageRoundState[]
+  image       Image             @relation("VersionsOfImage", fields: [imageId], references: [id], onDelete: Cascade)
+  uploadedBy  User?             @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  currentOf   Image?            @relation("CurrentVersion")
+  comments    Comment[]
+  annotations Annotation[]
+  roundStates ImageRoundState[]
 
   @@unique([imageId, versionNumber])
   @@index([imageId])
 }
 
 model ImageRoundState {
-  id         String   @id @default(cuid())
-  imageId    String
-  roundId    String
-  versionId  String
+  id          String    @id @default(cuid())
+  imageId     String
+  roundId     String
+  versionId   String
   // pending | approved | approved_with_notes | revision_requested | killed | final
-  status     String   @default("pending")
+  status      String    @default("pending")
   decidedById String?
   decidedAt   DateTime?
-  createdAt  DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
-  image    Image        @relation(fields: [imageId], references: [id], onDelete: Cascade)
-  round    ReviewRound  @relation(fields: [roundId], references: [id], onDelete: Cascade)
-  version  ImageVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
-  decidedBy User?       @relation("Decider", fields: [decidedById], references: [id], onDelete: SetNull)
+  image     Image        @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  round     ReviewRound  @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  version   ImageVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  decidedBy User?        @relation("Decider", fields: [decidedById], references: [id], onDelete: SetNull)
 
   @@unique([imageId, roundId])
   @@index([roundId])
@@ -298,28 +351,28 @@ model ImageRoundState {
 // ---------- Comments & annotations ----------
 
 model Comment {
-  id         String   @id @default(cuid())
-  imageId    String
-  versionId  String
-  roundId    String?
-  parentId   String?
-  authorId   String
-  body       String
+  id           String    @id @default(cuid())
+  imageId      String
+  versionId    String
+  roundId      String?
+  parentId     String?
+  authorId     String
+  body         String
   // client | internal
-  visibility String   @default("client")
+  visibility   String    @default("client")
   // Post-production / admins mark comments as "done" once the issue is
   // addressed in the new version. Stored as a timestamp so we can show
   // when + by whom without an extra audit query. Null = unresolved.
   resolvedAt   DateTime?
   resolvedById String?
-  createdAt  DateTime @default(now())
+  createdAt    DateTime  @default(now())
 
-  image    Image        @relation(fields: [imageId], references: [id], onDelete: Cascade)
-  version  ImageVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
-  round    ReviewRound? @relation(fields: [roundId], references: [id], onDelete: SetNull)
-  parent   Comment?     @relation("CommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
-  replies  Comment[]    @relation("CommentReplies")
-  author   User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  image       Image        @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  version     ImageVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  round       ReviewRound? @relation(fields: [roundId], references: [id], onDelete: SetNull)
+  parent      Comment?     @relation("CommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies     Comment[]    @relation("CommentReplies")
+  author      User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
   annotations Annotation[]
 
   @@index([imageId])
@@ -349,14 +402,14 @@ model Annotation {
 // ---------- Notifications, share links, exports, audit ----------
 
 model Notification {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   userId     String
-  kind       String   // round_opened | round_submitted | v2_ready | final_approved | mention | comment
+  kind       String // round_opened | round_submitted | v2_ready | final_approved | mention | comment
   entityType String
   entityId   String
-  payload    String?  // JSON
+  payload    String? // JSON
   readAt     DateTime?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -364,15 +417,15 @@ model Notification {
 }
 
 model ShareLink {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   projectId    String
-  scope        String   // project | gallery | image
+  scope        String // project | gallery | image
   scopeId      String
-  tokenHash    String   @unique
+  tokenHash    String    @unique
   passwordHash String?
   expiresAt    DateTime?
   createdById  String?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -382,7 +435,7 @@ model ShareLink {
 model Export {
   id          String   @id @default(cuid())
   projectId   String
-  kind        String   // feedback_pdf | final_zip | csv
+  kind        String // feedback_pdf | final_zip | csv
   payloadUrl  String
   createdById String?
   createdAt   DateTime @default(now())
@@ -400,7 +453,7 @@ model AuditLog {
   action     String
   targetType String
   targetId   String
-  payload    String?  // JSON
+  payload    String? // JSON
   createdAt  DateTime @default(now())
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)

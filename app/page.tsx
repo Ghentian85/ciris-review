@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentOrg } from "@/lib/org";
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
 
@@ -16,13 +17,24 @@ export default async function Dashboard({
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  let membership = await prisma.organizationMember.findFirst({
-    where: { userId: user.id },
-    include: { organization: true },
-  });
-  if (!membership) {
-    // Before creating a new org, check if this user has a pending invite.
-    // If so, don't auto-create — show a "check your email" message instead.
+  // Multi-tenant resolution: getCurrentOrg prefers an org matching the
+  // request hostname (studio360.ciris.studio → Studio 360). Falls back to
+  // the user's first org for dev / unrouted hostnames — keeps the legacy
+  // single-tenant experience on review.ciris.studio exactly as it was.
+  const currentOrg = await getCurrentOrg();
+
+  let membership = currentOrg
+    ? await prisma.organizationMember.findUnique({
+        where: {
+          orgId_userId: { orgId: currentOrg.id, userId: user.id },
+        },
+        include: { organization: true },
+      })
+    : null;
+
+  // Legacy / new-user path: user has no org yet AND no org is implied by the
+  // hostname. Check pending invites first, then seed a personal studio.
+  if (!membership && !currentOrg) {
     const pendingInvite = await prisma.invite.findFirst({
       where: { email: user.email, acceptedAt: null, expiresAt: { gt: new Date() } },
     });
@@ -40,6 +52,28 @@ export default async function Dashboard({
       include: { organization: true },
     });
   }
+
+  // Hostname-matched org exists but the signed-in user isn't a member →
+  // show a clear not-authorised screen rather than silently listing an
+  // unrelated org's projects.
+  if (!membership && currentOrg) {
+    return (
+      <main className="min-h-[60vh] grid place-items-center px-6 text-center">
+        <div className="max-w-sm">
+          <h1 className="font-display text-2xl tracking-tight">
+            {currentOrg.displayName ?? currentOrg.name}
+          </h1>
+          <p className="text-sm text-muted mt-3">
+            You&apos;re signed in as <strong className="text-ink">{user.email}</strong>{" "}
+            but don&apos;t have access to this workspace. Ask the administrator
+            to invite you.
+          </p>
+        </div>
+      </main>
+    );
+  }
+  // membership is non-null past this point
+  membership = membership!;
 
   // Limited roles: client_reviewer and post_production only see their own projects
   // and cannot create new projects. Check project-level roles.

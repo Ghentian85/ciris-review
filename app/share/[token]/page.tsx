@@ -104,9 +104,21 @@ export default async function PublicSharePage({
     // for this request — the client form path is the persistent one.
   }
 
-  // Load gallery + images
+  // Load gallery + images. Share-link visitors are treated as client-tier
+  // — on studioMode orgs they only see images that have been released. On
+  // non-studio orgs releasedAt is always null and the filter is a no-op.
+  const org = await prisma.organization.findFirst({
+    where: { projects: { some: { id: link.projectId } } },
+    select: { studioMode: true },
+  });
+  const studioMode = org?.studioMode ?? false;
+
   const images = await prisma.image.findMany({
-    where: { gallery: { projectId: link.projectId }, killed: false },
+    where: {
+      gallery: { projectId: link.projectId },
+      killed: false,
+      ...(studioMode ? { releasedAt: { not: null } } : {}),
+    },
     include: {
       currentVersion: {
         select: {

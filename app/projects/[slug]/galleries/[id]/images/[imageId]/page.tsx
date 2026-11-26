@@ -68,10 +68,13 @@ export default async function ImageDetailPage({
     where: { slug, members: { some: { userId: user.id } } },
     include: {
       members: { where: { userId: user.id }, take: 1 },
+      organization: { select: { studioMode: true } },
     },
   });
   if (!project) notFound();
   const role = (project.members[0]?.role ?? "client_reviewer") as Role;
+  const hideUnreleasedFromClient =
+    project.organization.studioMode && role === "client_reviewer";
 
   const gallery = await prisma.gallery.findFirst({
     where: { id: galleryId, projectId: project.id },
@@ -86,9 +89,14 @@ export default async function ImageDetailPage({
 
   // Drop killed images and orphans (no currentVersion — e.g. failed upload
   // where the version derivation threw after the Image row was created) so
-  // arrow nav and sibling lists never land on a dead page.
+  // arrow nav and sibling lists never land on a dead page. In studio mode,
+  // also drop unreleased images for client-tier viewers so a client can't
+  // follow a direct URL into an image the account manager hasn't released.
   const navigable = gallery.images.filter(
-    (i) => !i.killed && i.currentVersionId !== null
+    (i) =>
+      !i.killed &&
+      i.currentVersionId !== null &&
+      (!hideUnreleasedFromClient || i.releasedAt !== null)
   );
 
   // When the user came from a specific overview tab ("Still to review",
