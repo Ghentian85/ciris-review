@@ -13,9 +13,24 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
-  // 1. Lock chapter103 to review.ciris.studio
+  // 1. Lock Sam's primary org to review.ciris.studio. The slug varies
+  //    between dev (chapter103 from the seed) and prod (an auto-generated
+  //    studio-xxxx from the first sign-in). Find it via Sam's ownership
+  //    so this script works in either environment.
+  const sam = await prisma.user.findUnique({ where: { email: "sam@chapter103.com" } });
+  if (!sam) {
+    throw new Error("Sam's user (sam@chapter103.com) not found — sign in once first.");
+  }
+  const samOwnership = await prisma.organizationMember.findFirst({
+    where: { userId: sam.id, role: "owner" },
+    include: { organization: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (!samOwnership) {
+    throw new Error("No owner-role organization found for Sam.");
+  }
   const chapter = await prisma.organization.update({
-    where: { slug: "chapter103" },
+    where: { id: samOwnership.orgId },
     data: {
       hostname: "review.ciris.studio",
       // leave displayName/logo/brandAccent null → defaults to CIRIS
@@ -23,7 +38,7 @@ async function main() {
       studioMode: false,
     },
   });
-  console.log(`✓ ${chapter.name} → hostname=${chapter.hostname}`);
+  console.log(`✓ ${chapter.name} (slug=${chapter.slug}) → hostname=${chapter.hostname}`);
 
   // 2. Create Studio 360 org
   const studio = await prisma.organization.upsert({
