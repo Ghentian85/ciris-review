@@ -65,18 +65,13 @@ async function main() {
   console.log(`✓ ${studio.name} → hostname=${studio.hostname}  studioMode=${studio.studioMode}`);
 
   // 3. Add Sam as owner of Studio 360 (so he can log in on
-  //    studio360.ciris.studio and set it up).
-  const sam = await prisma.user.findUnique({ where: { email: "sam@chapter103.com" } });
-  if (!sam) {
-    console.warn("⚠ Sam's user not found — skipping ownership. Have him sign in first.");
-  } else {
-    await prisma.organizationMember.upsert({
-      where: { orgId_userId: { orgId: studio.id, userId: sam.id } },
-      create: { orgId: studio.id, userId: sam.id, role: "owner" },
-      update: { role: "owner" },
-    });
-    console.log(`✓ Sam added as owner of ${studio.name}`);
-  }
+  //    studio360.ciris.studio and set it up). Reuses `sam` resolved above.
+  await prisma.organizationMember.upsert({
+    where: { orgId_userId: { orgId: studio.id, userId: sam.id } },
+    create: { orgId: studio.id, userId: sam.id, role: "owner" },
+    update: { role: "owner" },
+  });
+  console.log(`✓ Sam added as owner of ${studio.name}`);
 
   console.log("");
   console.log("Done. Next steps:");
