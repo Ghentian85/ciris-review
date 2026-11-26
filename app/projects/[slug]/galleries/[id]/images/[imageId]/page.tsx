@@ -80,7 +80,18 @@ export default async function ImageDetailPage({
     where: { id: galleryId, projectId: project.id },
     include: {
       images: {
-        include: { currentVersion: true },
+        include: {
+          currentVersion: true,
+          // For the studio-mode client filter we need to know whether
+          // any version of this image has been released.
+          versions: hideUnreleasedFromClient
+            ? {
+                where: { releasedAt: { not: null } },
+                select: { id: true },
+                take: 1,
+              }
+            : false,
+        },
         orderBy: { position: "asc" },
       },
     },
@@ -90,13 +101,14 @@ export default async function ImageDetailPage({
   // Drop killed images and orphans (no currentVersion — e.g. failed upload
   // where the version derivation threw after the Image row was created) so
   // arrow nav and sibling lists never land on a dead page. In studio mode,
-  // also drop unreleased images for client-tier viewers so a client can't
-  // follow a direct URL into an image the account manager hasn't released.
+  // also drop images that have never been released for client-tier viewers
+  // so a client can't follow a direct URL into an unreleased image.
   const navigable = gallery.images.filter(
     (i) =>
       !i.killed &&
       i.currentVersionId !== null &&
-      (!hideUnreleasedFromClient || i.releasedAt !== null)
+      (!hideUnreleasedFromClient ||
+        ((i as unknown as { versions?: { id: string }[] }).versions?.length ?? 0) > 0)
   );
 
   // When the user came from a specific overview tab ("Still to review",
@@ -116,8 +128,13 @@ export default async function ImageDetailPage({
   if (!currentImage.currentVersion) notFound();
 
   // Load all versions for this image so we can render a switcher.
+  // In studio mode for client-tier, hide unreleased versions entirely —
+  // they shouldn't exist in that user's view of the world.
   const allVersions = await prisma.imageVersion.findMany({
-    where: { imageId: currentImage.id },
+    where: {
+      imageId: currentImage.id,
+      ...(hideUnreleasedFromClient ? { releasedAt: { not: null } } : {}),
+    },
     orderBy: { versionNumber: "asc" },
     select: {
       id: true,
@@ -126,19 +143,33 @@ export default async function ImageDetailPage({
       storagePathOriginal: true,
       width: true,
       height: true,
+      releasedAt: true,
     },
   });
 
-  // Resolve active version: default to currentVersion; ?v=N selects a specific
-  // version when valid (otherwise we silently fall back to current).
+  // Resolve active version. Precedence:
+  //   1. ?v=N explicit selection (must be in the allowed set above)
+  //   2. For studio-mode clients: the latest released version
+  //   3. Otherwise: the image's current version
   const requestedVersionNumber = rawV ? parseInt(rawV, 10) : NaN;
+  const latestReleased = [...allVersions]
+    .reverse()
+    .find((v) => v.releasedAt !== null);
   const activeVersion =
     (!Number.isNaN(requestedVersionNumber)
       ? allVersions.find((v) => v.versionNumber === requestedVersionNumber)
-      : null) ?? allVersions.find((v) => v.id === currentImage.currentVersionId);
+      : null) ??
+    (hideUnreleasedFromClient ? latestReleased : null) ??
+    allVersions.find((v) => v.id === currentImage.currentVersionId);
   if (!activeVersion) notFound();
 
-  const isHistory = activeVersion.id !== currentImage.currentVersionId;
+  // "History" means viewing a non-current version. For client-tier in
+  // studio mode the "current" is effectively the latest released, so we
+  // compute history against that instead of the real currentVersionId.
+  const effectiveCurrentId = hideUnreleasedFromClient
+    ? latestReleased?.id
+    : currentImage.currentVersionId;
+  const isHistory = activeVersion.id !== effectiveCurrentId;
 
   // Compare mode: ?compare=N pairs the active version against version N
   // (typically an older one). We refuse self-compare and silently ignore if

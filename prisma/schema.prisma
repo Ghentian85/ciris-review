@@ -277,12 +277,6 @@ model Image {
   position         Int       @default(0)
   killed           Boolean   @default(false)
   currentVersionId String?   @unique
-  // Studio-mode gating: when the project's org has studioMode=true, this
-  // timestamp marks when the image was released to client reviewers.
-  // Null = account-manager-only (internal review phase). Non-null = visible
-  // to everyone with project membership (including clients). On non-studio
-  // orgs this column stays null and is ignored by the client-view filter.
-  releasedAt       DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -316,6 +310,14 @@ model ImageVersion {
   colorProfile        String?
   uploadedById        String?
   uploadedAt          DateTime @default(now())
+  // Studio-mode gating. Null = still in internal review (account manager
+  // + retoucher only); timestamp = released to client reviewers. V1 of a
+  // slot is set to NOW on upload (client sees the first batch directly);
+  // V2 and beyond start null and wait for the account manager to click
+  // "Release to client". On non-studio orgs this is set to NOW for every
+  // version so the client-filter is always a no-op.
+  releasedAt          DateTime?
+  releasedById        String?
 
   image       Image             @relation("VersionsOfImage", fields: [imageId], references: [id], onDelete: Cascade)
   uploadedBy  User?             @relation(fields: [uploadedById], references: [id], onDelete: SetNull)

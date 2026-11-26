@@ -87,9 +87,13 @@ async function uploadHandler(
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { orgId: true },
+    select: {
+      orgId: true,
+      organization: { select: { studioMode: true } },
+    },
   });
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const studioMode = project.organization.studioMode;
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const parsed = parseSlot(
@@ -127,6 +131,10 @@ async function uploadHandler(
         versionNumber: nextVersionNumber,
         buffer,
       });
+      // Studio-mode gate: V2+ retouched versions start in the internal
+      // review tier (releasedAt null) and are hidden from client reviewers
+      // until the account manager clicks "Release to client". On non-
+      // studio orgs every version is auto-released on upload.
       const newVersion = await prisma.imageVersion.create({
         data: {
           imageId: existing.id,
@@ -139,6 +147,7 @@ async function uploadHandler(
           mime: stored.mime,
           sizeBytes: stored.sizeBytes,
           uploadedById: user.id,
+          releasedAt: studioMode ? null : new Date(),
         },
       });
       // Reset status to pending so the client re-reviews this version, and
@@ -208,6 +217,8 @@ async function uploadHandler(
     throw err;
   }
 
+  // V1 of a slot is always auto-released — the client sees the first batch
+  // directly. Studio-mode gating only affects V2+ (see the v2-path above).
   const version = await prisma.imageVersion.create({
     data: {
       imageId: image.id,
@@ -220,6 +231,7 @@ async function uploadHandler(
       mime: stored.mime,
       sizeBytes: stored.sizeBytes,
       uploadedById: user.id,
+      releasedAt: new Date(),
     },
   });
 

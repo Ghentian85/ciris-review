@@ -113,11 +113,17 @@ export default async function PublicSharePage({
   });
   const studioMode = org?.studioMode ?? false;
 
-  const images = await prisma.image.findMany({
+  // Studio mode: only images that have at least one released ImageVersion
+  // are visible, and we render the latest released version (not current,
+  // which may still be internal). Non-studio: every version is auto-
+  // released on upload so the filter is a no-op.
+  const rawImages = await prisma.image.findMany({
     where: {
       gallery: { projectId: link.projectId },
       killed: false,
-      ...(studioMode ? { releasedAt: { not: null } } : {}),
+      ...(studioMode
+        ? { versions: { some: { releasedAt: { not: null } } } }
+        : {}),
     },
     include: {
       currentVersion: {
@@ -128,9 +134,33 @@ export default async function PublicSharePage({
           height: true,
         },
       },
+      ...(studioMode
+        ? {
+            versions: {
+              where: { releasedAt: { not: null } },
+              orderBy: { versionNumber: "desc" },
+              take: 1,
+              select: {
+                storagePathThumb: true,
+                versionNumber: true,
+                width: true,
+                height: true,
+              },
+            },
+          }
+        : {}),
       gallery: { select: { id: true, name: true } },
     },
     orderBy: [{ gallery: { position: "asc" } }, { position: "asc" }],
+  });
+  // Effective version: released one for studio mode, current otherwise.
+  const images = rawImages.map((img) => {
+    const released =
+      studioMode &&
+      "versions" in img &&
+      (img as { versions?: Array<{ storagePathThumb: string | null; versionNumber: number; width: number; height: number }> }).versions?.[0];
+    const effective = released || img.currentVersion;
+    return { ...img, currentVersion: effective };
   });
 
   return (

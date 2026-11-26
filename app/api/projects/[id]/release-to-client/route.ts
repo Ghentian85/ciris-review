@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 
-// Studio-mode action. Sets Image.releasedAt = NOW on every image in the
-// project that's still in the internal review tier. After this call,
-// client-reviewer roles start seeing those images in their overview.
+// Studio-mode action. Releases every image's latest unreleased version to
+// the client-facing view. V1 of a slot is always released on upload
+// (clients see the first batch directly) — this flips V2 / V3 / ...
+// retouched versions from "internal only" to "client visible".
 //
-// Only admin / internal_reviewer on the project can trigger it. No-op on
-// non-studio orgs (setting the timestamp would be harmless there, but the
-// button is only rendered on studio orgs anyway).
+// Only admin / internal_reviewer on the project can trigger it. Rejected
+// on non-studio orgs (the button isn't shown there anyway).
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -39,17 +39,38 @@ export async function POST(
     );
   }
 
-  // Bulk release every image still held back.
+  // Release every ImageVersion in this project that's still held back —
+  // scoped via its parent image's gallery/project. Also resets the parent
+  // image's status to "pending" so the client re-reviews the new version.
   const now = new Date();
-  const result = await prisma.image.updateMany({
+  const releasedVersions = await prisma.imageVersion.updateMany({
+    where: {
+      releasedAt: null,
+      image: {
+        gallery: { projectId },
+        killed: false,
+      },
+    },
+    data: { releasedAt: now, releasedById: user.id },
+  });
+
+  // Reset status on every image whose currently-active version we just
+  // released. Status flips back to "pending" so the client treats it as
+  // a fresh thing to decide on.
+  const touchedImages = await prisma.image.findMany({
     where: {
       gallery: { projectId },
       killed: false,
-      currentVersionId: { not: null },
-      releasedAt: null,
+      currentVersion: { releasedAt: now },
     },
-    data: { releasedAt: now },
+    select: { id: true },
   });
+  if (touchedImages.length > 0) {
+    await prisma.image.updateMany({
+      where: { id: { in: touchedImages.map((i) => i.id) } },
+      data: { status: "pending", updatedAt: now },
+    });
+  }
 
   await prisma.auditLog.create({
     data: {
@@ -59,9 +80,12 @@ export async function POST(
       action: "project.released_to_client",
       targetType: "project",
       targetId: projectId,
-      payload: JSON.stringify({ releasedCount: result.count }),
+      payload: JSON.stringify({ releasedVersions: releasedVersions.count }),
     },
   });
 
-  return NextResponse.json({ ok: true, releasedCount: result.count });
+  return NextResponse.json({
+    ok: true,
+    releasedCount: releasedVersions.count,
+  });
 }

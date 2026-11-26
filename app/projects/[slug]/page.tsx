@@ -54,47 +54,69 @@ export default async function ProjectOverview({
   const isClient = role === "client_reviewer";
   const isOrgOwner = membership.role === "owner";
   const isOrgAdminRole = membership.role === "owner" || membership.role === "admin";
-  // Studio mode: client reviewers only see images that were explicitly
-  // released. Admin / internal see everything (released + still in internal
-  // review). On non-studio orgs this flag is false and the filter is a no-op.
+  // Studio mode: client reviewers only see ImageVersions that were
+  // released (releasedAt != null). V1 of a slot is released on upload so
+  // the client sees the first batch directly; V2+ retouched versions sit
+  // in the internal tier until the account manager clicks "Release to
+  // client". On non-studio orgs every version is auto-released on upload,
+  // so the filter is a no-op.
   const studioMode = project.organization.studioMode;
-  const hideUnreleasedFromClient = studioMode && isClient;
+  const clientFilter = studioMode && isClient;
 
-  // All images in the project, sorted for stable display. Excludes killed
-  // images and orphans (no currentVersion — e.g. an upload that crashed in
-  // Sharp after the Image row was created) so the overview never offers a
-  // link that 404s.
+  // Fetch images. For clients in studio mode we also include the latest
+  // RELEASED version per image — we render its thumb instead of the
+  // current (which may still be internal). Images without any released
+  // version are dropped entirely.
   const images = await prisma.image.findMany({
     where: {
       gallery: { projectId: project.id },
       killed: false,
       currentVersionId: { not: null },
-      ...(hideUnreleasedFromClient ? { releasedAt: { not: null } } : {}),
+      ...(clientFilter
+        ? { versions: { some: { releasedAt: { not: null } } } }
+        : {}),
     },
     include: {
       currentVersion: {
         select: {
+          id: true,
           storagePathThumb: true,
           versionNumber: true,
           width: true,
           height: true,
+          releasedAt: true,
         },
       },
+      ...(clientFilter
+        ? {
+            versions: {
+              where: { releasedAt: { not: null } },
+              orderBy: { versionNumber: "desc" },
+              take: 1,
+              select: {
+                id: true,
+                storagePathThumb: true,
+                versionNumber: true,
+                width: true,
+                height: true,
+              },
+            },
+          }
+        : {}),
       gallery: { select: { id: true, name: true } },
     },
     orderBy: [{ gallery: { position: "asc" } }, { slotName: "asc" }],
   });
 
-  // Count how many images are sitting in the internal-review tier (never
-  // released). Only meaningful in studioMode. Admins see this to know when
-  // to press "Release to client".
+  // Count images sitting in the internal-review tier (current version
+  // never released). Only meaningful in studio mode; admin sees this to
+  // know when to press "Release to client".
   const unreleasedCount = studioMode
     ? await prisma.image.count({
         where: {
           gallery: { projectId: project.id },
           killed: false,
-          currentVersionId: { not: null },
-          releasedAt: null,
+          currentVersion: { releasedAt: null },
         },
       })
     : 0;
@@ -251,20 +273,26 @@ export default async function ProjectOverview({
           </div>
         ) : (
           <ImageGridWithBulk
-            images={visible.map(
-              (img): GridImg => ({
+            images={visible.map((img): GridImg => {
+              // For studio-mode clients, show the latest released version
+              // instead of the current (which may still be internal).
+              const effective =
+                clientFilter && "versions" in img && (img as { versions?: Array<{ storagePathThumb: string | null; versionNumber: number; width: number; height: number }> }).versions?.[0]
+                  ? (img as { versions: Array<{ storagePathThumb: string | null; versionNumber: number; width: number; height: number }> }).versions[0]
+                  : img.currentVersion;
+              return {
                 id: img.id,
                 slotName: img.slotName,
                 displayName: img.displayName,
                 status: img.status,
                 galleryId: img.gallery.id,
                 galleryName: img.gallery.name,
-                thumbPath: img.currentVersion?.storagePathThumb ?? null,
-                versionNumber: img.currentVersion?.versionNumber ?? 1,
-                width: img.currentVersion?.width ?? 0,
-                height: img.currentVersion?.height ?? 0,
-              })
-            )}
+                thumbPath: effective?.storagePathThumb ?? null,
+                versionNumber: effective?.versionNumber ?? 1,
+                width: effective?.width ?? 0,
+                height: effective?.height ?? 0,
+              };
+            })}
             projectId={project.id}
             projectSlug={project.slug}
             fromTab={tab}
