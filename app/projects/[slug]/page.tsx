@@ -139,7 +139,6 @@ export default async function ProjectOverview({
                   slug: project.slug,
                   name: project.name,
                   briefUrl: project.briefUrl,
-                  watermarkPreview: project.watermarkPreview,
                   status: project.status,
                 }}
                 members={project.members.map((m) => ({

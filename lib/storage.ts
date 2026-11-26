@@ -14,7 +14,6 @@ export async function storeImageVersion(opts: {
   imageId: string;
   versionNumber: number;
   buffer: Buffer;
-  watermarkPreview?: boolean;
 }) {
   const storage = getStorage();
   const id = randomBytes(4).toString("hex");
@@ -29,28 +28,15 @@ export async function storeImageVersion(opts: {
     .metadata()
     .catch(() => ({}) as sharp.Metadata);
 
-  // Resize first, then size the watermark to the *actual* preview dimensions.
-  // Sharp's composite requires the overlay to be ≤ base in both axes.
+  // Resize to the preview tier.
   const resized = await sharp(opts.buffer, { failOn: "none" })
     .rotate()
     .resize({ width: 2000, withoutEnlargement: true })
     .toBuffer({ resolveWithObject: true });
 
-  let previewPipeline = sharp(resized.data, { failOn: "none" });
-  if (opts.watermarkPreview) {
-    const w = resized.info.width;
-    const h = resized.info.height;
-    const fontSize = Math.max(48, Math.round(Math.min(w, h) * 0.08));
-    const wmSvg = Buffer.from(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-        <text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle"
-          font-family="sans-serif" font-size="${fontSize}"
-          fill="rgba(255,255,255,0.22)" transform="rotate(-30 ${w / 2} ${h / 2})">PREVIEW</text>
-      </svg>`
-    );
-    previewPipeline = previewPipeline.composite([{ input: wmSvg, blend: "over" }]);
-  }
-  const previewBuffer = await previewPipeline.webp({ quality: 80 }).toBuffer();
+  const previewBuffer = await sharp(resized.data, { failOn: "none" })
+    .webp({ quality: 80 })
+    .toBuffer();
   await storage.putObject(previewKey, previewBuffer, { contentType: "image/webp" });
 
   const thumbBuffer = await sharp(opts.buffer, { failOn: "none" })

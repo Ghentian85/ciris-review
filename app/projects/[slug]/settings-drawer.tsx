@@ -20,7 +20,6 @@ type Project = {
   slug: string;
   name: string;
   briefUrl: string | null;
-  watermarkPreview: boolean;
   status: string;
 };
 
@@ -108,15 +107,13 @@ function GeneralSection({
   const router = useRouter();
   const [name, setName] = useState(project.name);
   const [briefUrl, setBriefUrl] = useState(project.briefUrl ?? "");
-  const [watermark, setWatermark] = useState(project.watermarkPreview);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
   const dirty =
     name.trim() !== project.name ||
-    (briefUrl || null) !== (project.briefUrl ?? null) ||
-    watermark !== project.watermarkPreview;
+    (briefUrl || null) !== (project.briefUrl ?? null);
 
   async function save() {
     if (!dirty || !name.trim()) return;
@@ -129,7 +126,6 @@ function GeneralSection({
         body: JSON.stringify({
           name: name.trim(),
           briefUrl: briefUrl.trim(),
-          watermarkPreview: watermark,
         }),
       });
       if (!res.ok) {
@@ -173,29 +169,21 @@ function GeneralSection({
             Optional. Linked from the project header so reviewers can reach the brief in one click.
           </p>
         </div>
-        <label className="flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={watermark}
-            onChange={(e) => setWatermark(e.target.checked)}
-            className="mt-0.5"
-          />
-          <span>
-            Watermark preview tier
-            <span className="block text-[11px] text-muted mt-0.5">
-              Adds a faint &quot;PREVIEW&quot; overlay on review-tier images. Applies to{" "}
-              <strong>future uploads only</strong> — to remove a baked-in watermark from
-              existing images,{" "}
-              <Link
-                href={`/projects/${project.slug}/refresh-previews`}
-                className="underline underline-offset-4 hover:text-ink"
-              >
-                refresh their previews
-              </Link>
-              .
-            </span>
-          </span>
-        </label>
+        {/* Watermark toggle removed Nov 2026 — new uploads never watermark.
+            Any image that still shows a baked-in "PREVIEW" overlay from the
+            old pipeline can be re-rendered via the Refresh previews page by
+            dropping the original master. */}
+        <div className="text-[11px] text-muted leading-relaxed">
+          Images previously uploaded with the PREVIEW watermark still carry it
+          in their pixels. Drop the originals into{" "}
+          <Link
+            href={`/projects/${project.slug}/refresh-previews`}
+            className="underline underline-offset-4 hover:text-ink"
+          >
+            Refresh previews
+          </Link>{" "}
+          to replace them.
+        </div>
         {error ? <p className="text-xs text-status-revision">{error}</p> : null}
         <div className="flex items-center justify-between pt-1">
           <span className="text-[11px] text-muted">

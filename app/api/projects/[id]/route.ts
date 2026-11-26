@@ -6,7 +6,6 @@ import { getCurrentUser } from "@/lib/auth";
 const patchSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   briefUrl: z.string().url().or(z.literal("")).nullable().optional(),
-  watermarkPreview: z.boolean().optional(),
   status: z.enum(["active", "archived"]).optional(),
 });
 
@@ -60,9 +59,6 @@ export async function PATCH(
   if (parsed.data.briefUrl !== undefined) {
     data.briefUrl = parsed.data.briefUrl ? parsed.data.briefUrl : null;
   }
-  if (parsed.data.watermarkPreview !== undefined) {
-    data.watermarkPreview = parsed.data.watermarkPreview;
-  }
   if (parsed.data.status !== undefined) {
     data.status = parsed.data.status;
   }
@@ -78,7 +74,6 @@ export async function PATCH(
       name: true,
       slug: true,
       briefUrl: true,
-      watermarkPreview: true,
       status: true,
       orgId: true,
     },

@@ -87,7 +87,7 @@ async function uploadHandler(
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { watermarkPreview: true, orgId: true },
+    select: { orgId: true },
   });
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -126,7 +126,6 @@ async function uploadHandler(
         imageId: existing.id,
         versionNumber: nextVersionNumber,
         buffer,
-        watermarkPreview: project?.watermarkPreview ?? true,
       });
       const newVersion = await prisma.imageVersion.create({
         data: {
@@ -203,7 +202,6 @@ async function uploadHandler(
       imageId: image.id,
       versionNumber: 1,
       buffer,
-      watermarkPreview: project?.watermarkPreview ?? true,
     });
   } catch (err) {
     await prisma.image.delete({ where: { id: image.id } }).catch(() => {});
