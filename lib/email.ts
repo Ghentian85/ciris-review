@@ -8,6 +8,29 @@ type SendEmail = {
   replyTo?: string;
 };
 
+// Per-tenant branding threaded through every email template. All fields
+// optional — anything missing falls back to CIRIS defaults so single-
+// tenant setups keep rendering exactly as before.
+export type EmailBrand = {
+  name?: string | null; // "CIRIS" | "Studio 360"
+  accent?: string | null; // button + accent colour (hex)
+  footerHost?: string | null; // "studio360.ciris.studio"
+  footerUrl?: string | null; // full URL used in the footer link
+  poweredByCiris?: boolean;
+};
+
+function resolveBrand(brand?: EmailBrand) {
+  const name = brand?.name ?? "CIRIS Review";
+  // Darker shade of the accent for solid buttons — keeps enough contrast
+  // against white text whatever the brand chose. Default = ink.
+  const buttonBg = brand?.accent ?? "#1c1917";
+  const footerUrl = brand?.footerUrl ?? env.APP_URL;
+  const footerHost =
+    brand?.footerHost ?? footerUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const footerExtra = brand?.poweredByCiris ? " · powered by CIRIS" : "";
+  return { name, buttonBg, footerUrl, footerHost, footerExtra };
+}
+
 // Send via Resend if RESEND_API_KEY is configured; otherwise dump to the
 // server log so dev still works without an account. Retries once on 5xx
 // since Resend occasionally returns 503 under load.
@@ -66,7 +89,13 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function shell(opts: { preheader: string; title: string; bodyHtml: string }) {
+function shell(opts: {
+  preheader: string;
+  title: string;
+  bodyHtml: string;
+  brand?: EmailBrand;
+}) {
+  const b = resolveBrand(opts.brand);
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -82,7 +111,7 @@ function shell(opts: { preheader: string; title: string; bodyHtml: string }) {
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background:#ffffff;border:1px solid #e7e5e4;border-radius:12px;overflow:hidden;">
           <tr>
             <td style="padding:24px 28px;border-bottom:1px solid #f5f5f4;">
-              <div style="font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#78716c;font-weight:600;">CIRIS Review</div>
+              <div style="font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#78716c;font-weight:600;">${escapeHtml(b.name)}</div>
             </td>
           </tr>
           <tr>
@@ -90,7 +119,7 @@ function shell(opts: { preheader: string; title: string; bodyHtml: string }) {
           </tr>
           <tr>
             <td style="padding:20px 28px;border-top:1px solid #f5f5f4;background:#fafaf9;font-size:12px;color:#78716c;">
-              Sent by CIRIS Review · <a href="${escapeHtml(env.APP_URL)}" style="color:#78716c;text-decoration:underline;">${escapeHtml(env.APP_URL.replace(/^https?:\/\//, ""))}</a>
+              Sent by ${escapeHtml(b.name)} · <a href="${escapeHtml(b.footerUrl)}" style="color:#78716c;text-decoration:underline;">${escapeHtml(b.footerHost)}</a>${escapeHtml(b.footerExtra)}
             </td>
           </tr>
         </table>
@@ -101,30 +130,49 @@ function shell(opts: { preheader: string; title: string; bodyHtml: string }) {
 </html>`;
 }
 
-function button(href: string, label: string) {
+function button(href: string, label: string, brand?: EmailBrand) {
+  const b = resolveBrand(brand);
+  // If the brand picked a light accent (e.g. Studio 360's yellow),
+  // switch the button text to ink so it stays legible.
+  const textColor = isLightColor(b.buttonBg) ? "#1c1917" : "#ffffff";
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;">
     <tr>
-      <td style="background:#1c1917;border-radius:8px;">
-        <a href="${escapeHtml(href)}" style="display:inline-block;padding:12px 22px;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;">${escapeHtml(label)}</a>
+      <td style="background:${b.buttonBg};border-radius:8px;">
+        <a href="${escapeHtml(href)}" style="display:inline-block;padding:12px 22px;color:${textColor};text-decoration:none;font-weight:600;font-size:14px;">${escapeHtml(label)}</a>
       </td>
     </tr>
   </table>`;
+}
+
+// Rough luminance check — picks black text on anything brighter than
+// mid-grey, white on everything darker. Good enough for brand accents,
+// not a full WCAG calc.
+function isLightColor(hex: string): boolean {
+  const m = hex.replace("#", "").match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (!m) return false;
+  const r = parseInt(m[1], 16);
+  const g = parseInt(m[2], 16);
+  const b = parseInt(m[3], 16);
+  // Perceived brightness (ITU-R BT.601).
+  return (r * 299 + g * 587 + b * 114) / 1000 > 160;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
 // Templates
 // ─────────────────────────────────────────────────────────────────────────
 
-export function magicLinkEmail(url: string) {
-  const subject = "Sign in to CIRIS Review";
+export function magicLinkEmail(url: string, brand?: EmailBrand) {
+  const name = brand?.name ?? "CIRIS Review";
+  const subject = `Sign in to ${name}`;
   const text = `Sign in by opening this link:\n\n${url}\n\nThis link expires in 30 minutes. If you didn't request it, you can safely ignore this email.`;
   const html = shell({
     preheader: "Your sign-in link — expires in 30 minutes.",
     title: subject,
+    brand,
     bodyHtml: `
-      <h1 style="margin:0 0 12px;font-size:20px;font-weight:600;color:#1c1917;">Sign in to CIRIS Review</h1>
+      <h1 style="margin:0 0 12px;font-size:20px;font-weight:600;color:#1c1917;">Sign in to ${escapeHtml(name)}</h1>
       <p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#44403c;">Click the button below to sign in. The link expires in 30 minutes.</p>
-      ${button(url, "Sign in")}
+      ${button(url, "Sign in", brand)}
       <p style="margin:0;font-size:12px;line-height:1.6;color:#78716c;">Or paste this URL into your browser:<br><span style="word-break:break-all;color:#44403c;">${escapeHtml(url)}</span></p>
       <p style="margin:16px 0 0;font-size:12px;line-height:1.6;color:#78716c;">If you didn't request this, you can ignore this email.</p>
     `,
@@ -136,8 +184,13 @@ export function magicLinkEmail(url: string) {
 // magic links, but the landing page asks for a new password. Sent from the
 // /api/auth/forgot endpoint and from the admin "Send password reset"
 // action in the members panel.
-export function passwordResetEmail(opts: { url: string; expiresHours: number }) {
-  const subject = "Reset your CIRIS Review password";
+export function passwordResetEmail(opts: {
+  url: string;
+  expiresHours: number;
+  brand?: EmailBrand;
+}) {
+  const name = opts.brand?.name ?? "CIRIS Review";
+  const subject = `Reset your ${name} password`;
   const text = [
     "Click the link below to set a new password. You'll be signed in automatically.",
     "",
@@ -148,10 +201,11 @@ export function passwordResetEmail(opts: { url: string; expiresHours: number }) 
   const html = shell({
     preheader: `Set a new password — link expires in ${opts.expiresHours} hours.`,
     title: subject,
+    brand: opts.brand,
     bodyHtml: `
       <h1 style="margin:0 0 12px;font-size:20px;font-weight:600;color:#1c1917;">Reset your password</h1>
       <p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#44403c;">Click the button below to sign in and pick a new password.</p>
-      ${button(opts.url, "Set a new password")}
+      ${button(opts.url, "Set a new password", opts.brand)}
       <p style="margin:0;font-size:12px;line-height:1.6;color:#78716c;">Or paste this URL into your browser:<br><span style="word-break:break-all;color:#44403c;">${escapeHtml(opts.url)}</span></p>
       <p style="margin:16px 0 0;font-size:12px;line-height:1.6;color:#78716c;">Link expires in ${opts.expiresHours} hours. If you didn't request this, you can safely ignore this email.</p>
     `,

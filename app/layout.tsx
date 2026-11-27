@@ -3,11 +3,33 @@ import "./globals.css";
 import { SiteFrame } from "@/components/app/site-frame";
 import { getCurrentUser, isOrgAdmin } from "@/lib/auth";
 import { getCurrentOrg } from "@/lib/org";
+import { brandFaviconSvg } from "@/lib/brand-favicon";
 
-export const metadata: Metadata = {
-  title: "CIRIS Review",
-  description: "Visual production review & approval for creative teams.",
-};
+// Metadata (title, description, favicon, open-graph) is resolved per
+// tenant from the request hostname. Studio 360 visitors see "Studio 360
+// Review" in their browser tab and get the 360° mark in the favicon;
+// chapter103 visitors keep the CIRIS title. The favicon is served as a
+// data: URI we generate from the org's brand accent so we don't have
+// to ship a separate .ico per tenant.
+export async function generateMetadata(): Promise<Metadata> {
+  const org = await getCurrentOrg();
+  const name = org?.displayName ?? "CIRIS";
+  const title = `${name} Review`;
+  const description =
+    org?.poweredByCiris
+      ? `${name} — production review, powered by CIRIS.`
+      : "Visual production review & approval for creative teams.";
+  const faviconHref = brandFaviconSvg(org?.brandAccent ?? null, org?.slug ?? null);
+  return {
+    title,
+    description,
+    icons: {
+      icon: [{ url: faviconHref, type: "image/svg+xml" }],
+    },
+    openGraph: { title, description },
+    twitter: { card: "summary", title, description },
+  };
+}
 
 export default async function RootLayout({
   children,
@@ -26,9 +48,17 @@ export default async function RootLayout({
     poweredByCiris: org?.poweredByCiris ?? false,
   };
 
+  // Expose the tenant's brand accent as a CSS variable so Tailwind's
+  // bg-accent / text-accent / border-accent utilities pick it up on
+  // studio360.ciris.studio without touching every button/chip. If the
+  // org didn't set one, falls back to whatever globals.css defined.
+  const brandAccentStyle = org?.brandAccent
+    ? ({ "--accent": org.brandAccent } as React.CSSProperties)
+    : undefined;
+
   return (
     <html lang="en">
-      <body>
+      <body style={brandAccentStyle}>
         <SiteFrame
           user={user ? { email: user.email } : null}
           isAdmin={isAdmin}

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createLoginToken } from "@/lib/auth";
 import { sendEmail, magicLinkEmail } from "@/lib/email";
 import { getRequestBaseUrl } from "@/lib/request-url";
+import { getCurrentOrg } from "@/lib/org";
 
 const schema = z.object({
   email: z.string().email(),
@@ -25,12 +26,22 @@ export async function POST(req: NextRequest) {
   // env.APP_URL — so the verify callback lands back on studio360.ciris.
   // studio (or any future whitelabel host) and the session cookie is
   // set on the right origin.
-  const verifyUrl = new URL("/api/auth/verify", getRequestBaseUrl(req));
+  const base = getRequestBaseUrl(req);
+  const verifyUrl = new URL("/api/auth/verify", base);
   verifyUrl.searchParams.set("token", raw);
   if (parsed.data.next) verifyUrl.searchParams.set("next", parsed.data.next);
   const url = verifyUrl.toString();
 
-  const tpl = magicLinkEmail(url);
+  const org = await getCurrentOrg();
+  const tpl = magicLinkEmail(url, {
+    name: org?.displayName
+      ? `${org.displayName} Review`
+      : `${org?.name ?? "CIRIS"} Review`,
+    accent: org?.brandAccent,
+    footerUrl: base,
+    footerHost: base.replace(/^https?:\/\//, ""),
+    poweredByCiris: org?.poweredByCiris ?? false,
+  });
   const result = await sendEmail({ to: user.email, ...tpl });
 
   return NextResponse.json({

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { mintSignInUrl } from "@/lib/auth";
 import { sendEmail, passwordResetEmail } from "@/lib/email";
 import { getRequestBaseUrl } from "@/lib/request-url";
+import { getCurrentOrg } from "@/lib/org";
 
 const schema = z.object({
   email: z.string().email(),
@@ -26,18 +27,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  const base = getRequestBaseUrl(req);
   const url = await mintSignInUrl({
     // Same per-tenant hostname logic as /login — reset links must land
     // back on the subdomain the user is actually trying to access.
-    baseUrl: getRequestBaseUrl(req),
+    baseUrl: base,
     email,
     nextPath: "/account/reset",
   });
   // The mintSignInUrl helper uses the 14-day TTL by default — for resets
   // we surface it as hours in the email copy. 14*24 = 336h.
+  const org = await getCurrentOrg();
   const result = await sendEmail({
     to: email,
-    ...passwordResetEmail({ url, expiresHours: 336 }),
+    ...passwordResetEmail({
+      url,
+      expiresHours: 336,
+      brand: {
+        name: org?.displayName
+          ? `${org.displayName} Review`
+          : `${org?.name ?? "CIRIS"} Review`,
+        accent: org?.brandAccent,
+        footerUrl: base,
+        footerHost: base.replace(/^https?:\/\//, ""),
+        poweredByCiris: org?.poweredByCiris ?? false,
+      },
+    }),
   });
 
   return NextResponse.json({
