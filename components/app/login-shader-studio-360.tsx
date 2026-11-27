@@ -10,18 +10,22 @@ import { ShaderGradientCanvas, ShaderGradient } from "@shadergradient/react";
 const SHADER_CONFIG = {
   control: "props",
   animate: "on",
-  brightness: 1.1,
+  brightness: 1.0,
   cAzimuthAngle: 180,
   cDistance: 2.6,
   cPolarAngle: 90,
   cameraZoom: 1,
-  // Tri-stop palette: deep ink → brand yellow → warm highlight.
-  // Keeping the darkest colour pure-ish so the composition doesn't
-  // bleed into brown.
+  // Tri-stop palette: deep ink → pure Pantone-adjacent yellow →
+  // lighter pure yellow. No orange undertone — the brand accent
+  // #FFB500 reads as orange when softened by warm lighting, so for
+  // the shader we shift a notch cooler. UI chrome keeps #FFB500.
   color1: "#0a0a0a",
-  color2: "#FFB500",
-  color3: "#FFD36B",
-  envPreset: "city",
+  color2: "#FFCF00",
+  color3: "#FFE866",
+  // "studio" is a cooler, more neutral HDRI than "city" (which bakes
+  // warm sodium tones into the reflections and tipped the whole scene
+  // towards orange).
+  envPreset: "studio",
   fov: 80,
   frameRate: 10,
   grain: "on",
