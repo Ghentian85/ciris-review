@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/app/logo";
+import { Studio360Backdrop, PoweredByCirisMark } from "./studio-360-decor";
 
 // WebGL shader background — loaded only on the client so three.js +
 // react-three-fiber don't end up in the SSR bundle.
@@ -104,30 +105,13 @@ export default function LoginClient({ brand }: { brand: LoginBrand }) {
   return (
     <main className="min-h-screen grid lg:grid-cols-2">
       {/* Left: brand panel.
-          Default (CIRIS): shadergradient background + ink wash.
-          Studio 360: flat black with a single large yellow arc + a
-          corner motif echoing their brandbook — the shader is an
-          off-brand aesthetic for them and gets replaced. */}
+          Default (CIRIS): WebGL shader + ink wash.
+          Studio 360: a slowly rotating 360° protractor + yellow glow +
+          filmic grain — replaces the off-brand shader with something
+          that literally means their name. */}
       <aside className="hidden lg:block relative bg-ink text-bg overflow-hidden">
         {isStudio360 ? (
-          <>
-            {/* Oversized yellow glow lower-right — echoes the 360° arc
-                without reproducing their pattern verbatim. */}
-            <div
-              aria-hidden
-              className="absolute -right-40 -bottom-40 h-[640px] w-[640px] rounded-full pointer-events-none"
-              style={{
-                background: `radial-gradient(circle at center, ${brand.accent ?? "#FFB500"} 0%, transparent 65%)`,
-                opacity: 0.35,
-              }}
-            />
-            {/* Corner mark — tiny yellow dot top-right, their arc motif. */}
-            <div
-              aria-hidden
-              className="absolute top-10 right-10 h-3 w-3 rounded-full"
-              style={{ background: brand.accent ?? "#FFB500" }}
-            />
-          </>
+          <Studio360Backdrop accent={brand.accent ?? "#FFB500"} />
         ) : (
           <>
             <div aria-hidden className="absolute inset-0">
@@ -158,9 +142,7 @@ export default function LoginClient({ brand }: { brand: LoginBrand }) {
           </div>
         </div>
         {brand.poweredByCiris ? (
-          <p className="absolute bottom-8 left-12 text-[10px] tracking-[0.2em] uppercase text-bg/40">
-            Powered by CIRIS
-          </p>
+          <PoweredByCirisMark accent={brand.accent ?? "#FFB500"} />
         ) : (
           <p className="absolute bottom-8 left-12 text-[10px] tracking-[0.2em] uppercase text-bg/40">
             A CIRIS Studio product
