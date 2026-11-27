@@ -9,102 +9,75 @@ import { Logo } from "@/components/app/logo";
 
 export function Studio360Backdrop({ accent }: { accent: string }) {
   return (
-    <div aria-hidden className="absolute inset-0 overflow-hidden">
-      {/* Big yellow radial glow lower-right — warms the panel. */}
+    <div aria-hidden className="absolute inset-0 overflow-hidden bg-ink">
+      {/* Bauhaus composition. Three big primitives — a quarter-circle, a
+          half-circle, a disc — arranged asymmetrically against pure
+          black. Direct lift of their brandbook vocabulary (geometric
+          yellow/black primitives), but calmer: fewer forms, bigger,
+          more negative space. Nothing rotates. Breathing only. */}
+
+      {/* 1. Giant yellow quarter-circle rising from the bottom edge —
+            the hero form. Positioned off-centre low so it reads as a
+            "rising sun" shape. */}
       <div
-        className="absolute -right-40 -bottom-56 h-[720px] w-[720px] rounded-full pointer-events-none"
+        className="absolute left-[-10%] bottom-[-55%] h-[120%] w-[120%] rounded-full animate-s360-breathe"
+        style={{
+          background: accent,
+          willChange: "transform, opacity",
+        }}
+      />
+
+      {/* 2. Overlapping pure-black disc, smaller, pushed low-right so it
+            carves into the yellow — the signature "eclipse" tension
+            their brandbook uses on page 1 (big black half over yellow). */}
+      <div
+        className="absolute right-[-20%] bottom-[-10%] h-[70%] w-[70%] rounded-full"
+        style={{ background: "#000" }}
+      />
+
+      {/* 3. Mid-tone yellow disc upper-right — the small "satellite"
+            that keeps the composition from reading symmetrical. */}
+      <div
+        className="absolute right-[12%] top-[14%] h-[56px] w-[56px] rounded-full"
+        style={{ background: accent, opacity: 0.9 }}
+      />
+
+      {/* 4. Tiny yellow dot cluster upper-left — the third-position
+            visual rhyme with their pattern page. */}
+      <div className="absolute left-[18%] top-[22%] flex gap-2">
+        <span
+          className="h-2 w-2 rounded-full"
+          style={{ background: accent, opacity: 0.9 }}
+        />
+        <span
+          className="h-2 w-2 rounded-full"
+          style={{ background: accent, opacity: 0.4 }}
+        />
+        <span
+          className="h-2 w-2 rounded-full"
+          style={{ background: accent, opacity: 0.2 }}
+        />
+      </div>
+
+      {/* 5. Soft glow haloing the yellow quarter-circle — so it feels
+            lit rather than pasted on. */}
+      <div
+        className="absolute left-[-5%] bottom-[-45%] h-[110%] w-[110%] rounded-full pointer-events-none animate-s360-breathe"
         style={{
           background: `radial-gradient(circle at center, ${accent} 0%, transparent 60%)`,
-          opacity: 0.32,
-          filter: "blur(40px)",
+          opacity: 0.35,
+          filter: "blur(60px)",
+          willChange: "opacity, transform",
         }}
       />
 
-      {/* Second, smaller spotlight upper-right — asymmetric so the page
-          doesn't feel centred. */}
-      <div
-        className="absolute -right-24 -top-24 h-[360px] w-[360px] rounded-full pointer-events-none"
-        style={{
-          background: `radial-gradient(circle at center, ${accent} 0%, transparent 65%)`,
-          opacity: 0.12,
-          filter: "blur(30px)",
-        }}
-      />
-
-      {/* Slow-rotating 360° protractor — the brand's core visual idea
-          made literal. SVG sits in the centre-left, large enough to
-          read as structure, light enough to never compete with type. */}
+      {/* 6. Filmic grain — SVG fractal noise, 7%. Stops the flat fills
+            reading as vector-plastic. */}
       <svg
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 animate-rotate-slow"
-        width="860"
-        height="860"
-        viewBox="0 0 860 860"
-        fill="none"
+        className="absolute inset-0 w-full h-full pointer-events-none mix-blend-overlay"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <defs>
-          <radialGradient id="s360-ring-fade" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor={accent} stopOpacity="0" />
-            <stop offset="85%" stopColor={accent} stopOpacity="0.5" />
-            <stop offset="100%" stopColor={accent} stopOpacity="0" />
-          </radialGradient>
-        </defs>
-
-        {/* Outer hairline ring */}
-        <circle
-          cx="430"
-          cy="430"
-          r="400"
-          stroke={accent}
-          strokeOpacity="0.18"
-          strokeWidth="1"
-        />
-        {/* Inner ring, fades in/out through its arc */}
-        <circle
-          cx="430"
-          cy="430"
-          r="370"
-          stroke="url(#s360-ring-fade)"
-          strokeWidth="1"
-        />
-
-        {/* 360 tick-marks — one per degree. Rendered via SVG <g> with
-            rotation transforms. Every 10th tick is longer so you read
-            the full protractor. */}
-        <g>
-          {Array.from({ length: 72 }).map((_, i) => {
-            const angle = (i / 72) * 360;
-            const isMajor = i % 3 === 0; // every 15°
-            const len = isMajor ? 18 : 8;
-            const stroke = isMajor ? 0.22 : 0.12;
-            return (
-              <line
-                key={i}
-                x1="430"
-                y1="18"
-                x2="430"
-                y2={18 + len}
-                stroke={accent}
-                strokeOpacity={stroke}
-                strokeWidth="1"
-                transform={`rotate(${angle} 430 430)`}
-              />
-            );
-          })}
-        </g>
-
-        {/* The signature yellow arc at the top — their degree-mark dot
-            made bigger, orbiting slowly as the whole SVG spins. */}
-        <circle cx="430" cy="30" r="12" fill={accent} opacity="0.85" />
-      </svg>
-
-      {/* Filmic grain — SVG fractal noise, blended multiply at 6%. Cheap,
-          scales with viewport, stops the flat black reading as plastic. */}
-      <svg
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <filter id="s360-noise">
+        <filter id="s360-grain">
           <feTurbulence
             type="fractalNoise"
             baseFrequency="0.9"
@@ -116,31 +89,21 @@ export function Studio360Backdrop({ accent }: { accent: string }) {
         <rect
           width="100%"
           height="100%"
-          filter="url(#s360-noise)"
-          opacity="0.06"
+          filter="url(#s360-grain)"
+          opacity="0.07"
         />
       </svg>
 
-      {/* Vignette — darkens the edges by a hair so the glow pops. */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            "radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.5) 100%)",
-        }}
-      />
-
       <style>{`
-        @keyframes s360-rotate-slow {
-          from { transform: translate(-50%, -50%) rotate(0deg); }
-          to   { transform: translate(-50%, -50%) rotate(360deg); }
+        @keyframes s360-breathe {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50%      { transform: scale(1.015); opacity: 0.95; }
         }
-        .animate-rotate-slow {
-          animation: s360-rotate-slow 120s linear infinite;
-          will-change: transform;
+        .animate-s360-breathe {
+          animation: s360-breathe 10s ease-in-out infinite;
         }
         @media (prefers-reduced-motion: reduce) {
-          .animate-rotate-slow { animation: none; }
+          .animate-s360-breathe { animation: none; }
         }
       `}</style>
     </div>
