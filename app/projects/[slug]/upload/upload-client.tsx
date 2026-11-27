@@ -60,7 +60,61 @@ export function UploadClient({
     return { done, skipped, err, total: items.length };
   }, [items]);
 
-  async function uploadOne(item: UploadItem): Promise<void> {
+  function setProgress(itemId: string, pct: number) {
+    setItems((cur) => cur.map((i) => (i.id === itemId ? { ...i, progress: pct } : i)));
+  }
+
+  function setItemStatus(
+    itemId: string,
+    patch: Partial<Pick<UploadItem, "status" | "progress" | "error" | "skipReason">>
+  ) {
+    setItems((cur) => cur.map((i) => (i.id === itemId ? { ...i, ...patch } : i)));
+  }
+
+  function handleFinalizeBody(
+    item: UploadItem,
+    body: { skipped?: boolean; reason?: string }
+  ) {
+    if (body.skipped) {
+      setItemStatus(item.id, {
+        status: "skipped",
+        progress: 100,
+        skipReason: body.reason,
+      });
+    } else {
+      setItemStatus(item.id, { status: "done", progress: 100 });
+    }
+  }
+
+  // Direct-to-storage PUT (bypasses Vercel's 4.5 MB serverless body limit).
+  // Returns true on success so the caller can finalize.
+  function putToPresignedUrl(
+    item: UploadItem,
+    url: string,
+    headers: Record<string, string> | null
+  ): Promise<boolean> {
+    return new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", url);
+      if (headers) {
+        for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
+      }
+      xhr.upload.onprogress = (e) => {
+        if (!e.lengthComputable) return;
+        // Reserve the last 5% for the server-side derive step so the bar
+        // doesn't sit at 100% while Sharp is running.
+        const pct = Math.round((e.loaded / e.total) * 95);
+        setProgress(item.id, pct);
+      };
+      xhr.onload = () => resolve(xhr.status >= 200 && xhr.status < 300);
+      xhr.onerror = () => resolve(false);
+      xhr.send(item.file);
+    });
+  }
+
+  // Legacy flow for dev (local FS adapter can't presign). Full file goes
+  // through our own /upload route as multipart.
+  function legacyMultipartUpload(item: UploadItem): Promise<void> {
     return new Promise((resolve) => {
       const form = new FormData();
       form.append("file", item.file);
@@ -70,61 +124,113 @@ export function UploadClient({
       xhr.open("POST", `/api/projects/${projectId}/upload`);
       xhr.upload.onprogress = (e) => {
         if (!e.lengthComputable) return;
-        const pct = Math.round((e.loaded / e.total) * 100);
-        setItems((cur) =>
-          cur.map((i) => (i.id === item.id ? { ...i, progress: pct } : i))
-        );
+        setProgress(item.id, Math.round((e.loaded / e.total) * 100));
       };
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
-          // Server may respond 200 with { skipped: true } when a slot
-          // already exists and we're in v1 mode — surface it as its own
-          // status so the user sees at a glance which files were dropped.
-          let skipped = false;
-          let skipReason: string | undefined;
           try {
-            const body = JSON.parse(xhr.responseText) as { skipped?: boolean; reason?: string };
-            if (body.skipped) {
-              skipped = true;
-              skipReason = body.reason;
-            }
-          } catch {}
-          setItems((cur) =>
-            cur.map((i) =>
-              i.id === item.id
-                ? skipped
-                  ? { ...i, status: "skipped", progress: 100, skipReason }
-                  : { ...i, status: "done", progress: 100 }
-                : i
-            )
-          );
+            handleFinalizeBody(
+              item,
+              JSON.parse(xhr.responseText) as { skipped?: boolean; reason?: string }
+            );
+          } catch {
+            setItemStatus(item.id, { status: "done", progress: 100 });
+          }
         } else {
           let msg = "Upload failed";
           try {
             const body = JSON.parse(xhr.responseText) as { error?: string };
             if (body.error) msg = body.error;
           } catch {}
-          setItems((cur) =>
-            cur.map((i) =>
-              i.id === item.id ? { ...i, status: "error", error: msg } : i
-            )
-          );
+          setItemStatus(item.id, { status: "error", error: msg });
         }
         resolve();
       };
       xhr.onerror = () => {
-        setItems((cur) =>
-          cur.map((i) =>
-            i.id === item.id ? { ...i, status: "error", error: "Network error" } : i
-          )
-        );
+        setItemStatus(item.id, { status: "error", error: "Network error" });
         resolve();
       };
-      setItems((cur) =>
-        cur.map((i) => (i.id === item.id ? { ...i, status: "uploading" } : i))
-      );
       xhr.send(form);
     });
+  }
+
+  async function uploadOne(item: UploadItem): Promise<void> {
+    setItemStatus(item.id, { status: "uploading", progress: 0 });
+
+    // Step 1: ask the server for a presigned URL. If the adapter can't
+    // presign (local-FS dev adapter returns uploadUrl: null), fall back
+    // to the legacy multipart POST.
+    let presign: {
+      uploadKey: string;
+      uploadUrl: string | null;
+      headers: Record<string, string> | null;
+    };
+    try {
+      const res = await fetch(`/api/projects/${projectId}/upload/presign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filename: item.file.name,
+          contentType: item.file.type || "application/octet-stream",
+          size: item.file.size,
+        }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setItemStatus(item.id, {
+          status: "error",
+          error: body.error ?? `Presign failed (${res.status})`,
+        });
+        return;
+      }
+      presign = (await res.json()) as typeof presign;
+    } catch {
+      setItemStatus(item.id, { status: "error", error: "Network error (presign)" });
+      return;
+    }
+
+    if (!presign.uploadUrl) {
+      return legacyMultipartUpload(item);
+    }
+
+    // Step 2: PUT the raw bytes directly to R2.
+    const putOk = await putToPresignedUrl(
+      item,
+      presign.uploadUrl,
+      presign.headers
+    );
+    if (!putOk) {
+      setItemStatus(item.id, { status: "error", error: "Upload to storage failed" });
+      return;
+    }
+
+    // Step 3: tell the server to derive preview+thumb and write the row.
+    try {
+      const res = await fetch(`/api/projects/${projectId}/upload/finalize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uploadKey: presign.uploadKey,
+          filename: item.file.name,
+          mode,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        skipped?: boolean;
+        reason?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        setItemStatus(item.id, {
+          status: "error",
+          error: body.error ?? `Finalize failed (${res.status})`,
+        });
+        return;
+      }
+      handleFinalizeBody(item, body);
+    } catch {
+      setItemStatus(item.id, { status: "error", error: "Network error (finalize)" });
+    }
   }
 
   async function start() {

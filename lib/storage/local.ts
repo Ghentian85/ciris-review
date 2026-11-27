@@ -64,6 +64,13 @@ export class LocalStorageAdapter implements StorageAdapter {
       // ignore missing
     }
   }
+
+  async createUploadUrl() {
+    // No presigned URLs on local FS — the client falls back to the
+    // legacy multipart POST, which works fine in dev (no Vercel body
+    // limit) and is the only adapter path that stays on disk.
+    return null;
+  }
 }
 
 function guessContentType(key: string): string {

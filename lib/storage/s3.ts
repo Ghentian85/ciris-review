@@ -9,6 +9,7 @@ import {
   NoSuchKey,
   NotFound,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import {
   type StorageAdapter,
   type ObjectMeta,
@@ -110,6 +111,30 @@ export class S3StorageAdapter implements StorageAdapter {
     } catch {
       // best-effort — match local adapter semantics
     }
+  }
+
+  async createUploadUrl(
+    key: string,
+    opts: { contentType: string; expiresInSeconds?: number }
+  ) {
+    // Presigned PUT URL. The client PUTs the raw file bytes directly to
+    // R2/S3, bypassing the Vercel 4.5 MB serverless body limit. The
+    // Content-Type MUST match exactly what the client sends — the signer
+    // locks it into the signature, so a mismatched header fails the PUT.
+    const url = await getSignedUrl(
+      this.client,
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        ContentType: opts.contentType,
+      }),
+      { expiresIn: opts.expiresInSeconds ?? 3600 }
+    );
+    return {
+      url,
+      method: "PUT" as const,
+      headers: { "Content-Type": opts.contentType },
+    };
   }
 
   async deletePrefix(prefix: string): Promise<void> {

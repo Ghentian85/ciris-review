@@ -17,6 +17,16 @@ export interface StorageAdapter {
   deleteObject(key: string): Promise<void>;
   /** Delete everything under a key prefix (for project cleanup). */
   deletePrefix(prefix: string): Promise<void>;
+  /**
+   * Mint a short-lived URL the client can PUT the raw file bytes to,
+   * bypassing the Vercel serverless 4.5 MB body limit. Returns a
+   * `null` endpoint when the adapter can't presign (the local
+   * dev adapter) — the client then falls back to the legacy POST.
+   */
+  createUploadUrl(
+    key: string,
+    opts: { contentType: string; expiresInSeconds?: number }
+  ): Promise<{ url: string; method: "PUT"; headers?: Record<string, string> } | null>;
 }
 
 export class StorageNotFoundError extends Error {
