@@ -17,6 +17,11 @@ const PUBLIC_PATHS = [
   "/favicon.ico",
   // Static branding — needs to load even on the login page.
   "/logo.svg",
+  // Per-tenant logo + brand assets served from /public/orgs/. The sign-
+  // in page references these before any cookie exists, so they MUST be
+  // reachable anonymously — otherwise the middleware 307's them to
+  // /login and the browser renders a broken-image icon in their place.
+  "/orgs",
   // User guide — public so prospects, new hires, and confused clients
   // can read it without needing an account first.
   "/help",
