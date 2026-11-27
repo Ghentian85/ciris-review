@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/app/logo";
-import { Studio360Backdrop, PoweredByCirisMark } from "./studio-360-decor";
+import { PoweredByCirisMark } from "./studio-360-decor";
 
 // WebGL shader background — loaded only on the client so three.js +
 // react-three-fiber don't end up in the SSR bundle.
@@ -15,6 +15,12 @@ const LoginShader = dynamic(() => import("@/components/app/login-shader"), {
   ssr: false,
   loading: () => null,
 });
+
+// Same shader, re-palletted to Studio 360's black + yellow range.
+const LoginShaderStudio360 = dynamic(
+  () => import("@/components/app/login-shader-studio-360"),
+  { ssr: false, loading: () => null }
+);
 
 type Mode = "password" | "magic";
 
@@ -105,25 +111,18 @@ export default function LoginClient({ brand }: { brand: LoginBrand }) {
   return (
     <main className="min-h-screen grid lg:grid-cols-2">
       {/* Left: brand panel.
-          Default (CIRIS): WebGL shader + ink wash.
-          Studio 360: a slowly rotating 360° protractor + yellow glow +
-          filmic grain — replaces the off-brand shader with something
-          that literally means their name. */}
+          Default (CIRIS): WebGL shader with warm/coral palette.
+          Studio 360: same shader, re-palletted to black + yellow —
+          same organic motion, just dressed in their colours. */}
       <aside className="hidden lg:block relative bg-ink text-bg overflow-hidden">
-        {isStudio360 ? (
-          <Studio360Backdrop accent={brand.accent ?? "#FFB500"} />
-        ) : (
-          <>
-            <div aria-hidden className="absolute inset-0">
-              <LoginShader />
-            </div>
-            <div aria-hidden className="absolute inset-0 bg-black/35 pointer-events-none" />
-            <div
-              aria-hidden
-              className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/40 pointer-events-none"
-            />
-          </>
-        )}
+        <div aria-hidden className="absolute inset-0">
+          {isStudio360 ? <LoginShaderStudio360 /> : <LoginShader />}
+        </div>
+        <div aria-hidden className="absolute inset-0 bg-black/35 pointer-events-none" />
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/40 pointer-events-none"
+        />
         <div className="relative h-full flex items-center px-12">
           <div className="flex items-center gap-5 text-bg">
             {brand.logoUrl ? (
