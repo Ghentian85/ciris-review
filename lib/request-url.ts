@@ -27,11 +27,19 @@ function hostIsAllowed(host: string): boolean {
 
 export function getRequestBaseUrl(req: NextRequest): string {
   const forwardedHost = req.headers.get("x-forwarded-host");
-  const host = (forwardedHost || req.headers.get("host") || "").toLowerCase().split(",")[0]?.trim();
+  const host = (forwardedHost || req.headers.get("host") || "")
+    .toLowerCase()
+    .split(",")[0]
+    ?.trim();
   if (host && hostIsAllowed(host)) {
-    const proto =
-      req.headers.get("x-forwarded-proto") ||
-      (host.startsWith("localhost") || host.startsWith("127.0.0.1") ? "http" : "https");
+    // Protocol: localhost gets http, everything else is forced to https.
+    // Trusting x-forwarded-proto bit us — the request that mints the
+    // magic link sometimes arrives through an upstream that forwards
+    // "http", and the resulting Secure cookie is dropped by the browser
+    // after the verify redirect, kicking the user back to sign-in.
+    const isLocal =
+      host.startsWith("localhost") || host.startsWith("127.0.0.1");
+    const proto = isLocal ? "http" : "https";
     return `${proto}://${host}`;
   }
   return env.APP_URL;
