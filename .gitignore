@@ -5,6 +5,7 @@ data
 *.db-journal
 .env
 .env*.local
+.env.vercel
 .DS_Store
 tsconfig.tsbuildinfo
 .vercel
