@@ -13,6 +13,8 @@ export default async function LoginPage() {
         displayName: org?.displayName ?? null,
         logoUrl: org?.logoUrl ?? null,
         poweredByCiris: org?.poweredByCiris ?? false,
+        slug: org?.slug ?? null,
+        accent: org?.brandAccent ?? null,
       }}
     />
   );

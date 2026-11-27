@@ -178,6 +178,77 @@
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+   Tenant: Studio 360
+   Activated by `<body data-brand="studio-360">`, which app/layout.tsx
+   sets whenever getCurrentOrg().slug === "studio-360". chapter103
+   remains on the warm/coral default above — zero bleed.
+
+   Brand rules from their book:
+     • Primary:   #000000 ink, #FFB500 PANTONE 7549 C yellow
+     • Type:      Neue Haas Grotesque Medium (titles) / Regular (body)
+                  — we ship Inter via next/font/google as a free
+                  near-twin with the same grotesk skeleton.
+     • Tracking:  +50/1000 in body (brandbook calls for it).
+     • No warm gradients. No coral. Strict high-contrast.
+   ───────────────────────────────────────────────────────────────────── */
+body[data-brand="studio-360"] {
+  /* Cool, neutral surface — replaces the warm wash. */
+  --bg: 0 0% 98%;
+  --bg-elev: 0 0% 100%;
+  --surface: 0 0% 100%;
+  --surface-glass: 0 0% 100% / 0.78;
+  --ink: 0 0% 7%;
+  --ink-soft: 0 0% 22%;
+  --muted: 0 0% 42%;
+  --muted-soft: 0 0% 60%;
+  --line: 0 0% 90%;
+  --line-soft: 0 0% 94%;
+
+  /* Accent switches to brand yellow. --accent is still inlined by
+     layout.tsx when the org row has brandAccent set, but we match it
+     here as a safety net and expose a HSL triplet for anything using
+     `hsl(var(--accent))` directly. */
+  --accent: 40 100% 50%;         /* ≈ #FFB500 */
+  --accent-soft: 40 100% 92%;
+
+  /* Keep status chips functional (red/green/amber), but drop the
+     warm tint so they read as pure state, not mood. */
+  --status-revision: 0 75% 50%;
+  --status-revision-soft: 0 75% 95%;
+  --status-approved: 142 60% 38%;
+  --status-approved-soft: 142 55% 94%;
+  --status-notes: 40 100% 48%;
+  --status-notes-soft: 40 100% 94%;
+
+  /* Kill the warm radial-gradient wash — replace with a crisp flat
+     ground and a single faint yellow glow top-left. */
+  background-image:
+    radial-gradient(ellipse 900px 700px at 0% 0%, hsl(40 100% 50% / 0.06), transparent 60%);
+
+  font-family: var(--font-grotesque), var(--font-sans);
+  letter-spacing: 0.005em; /* brandbook's +50/1000 ≈ 0.05em at display,
+                              much lighter at body — we keep this subtle
+                              so it doesn't look stretched at 14px. */
+}
+
+body[data-brand="studio-360"] h1,
+body[data-brand="studio-360"] h2,
+body[data-brand="studio-360"] h3,
+body[data-brand="studio-360"] h4,
+body[data-brand="studio-360"] .font-display {
+  font-family: var(--font-grotesque), var(--font-sans);
+  font-weight: 500; /* Neue Haas Grotesque Medium per brandbook */
+  letter-spacing: -0.01em;
+}
+
+/* The link/button accents on the dark topbar become yellow instead
+   of the (now cool) default. */
+body[data-brand="studio-360"] .pill-active {
+  background: hsl(var(--accent));
+  color: hsl(0 0% 7%);
+}
+
 @layer utilities {
   /* "Pressable" feel — slight scale on active, gentle lift on hover. */
   .press {

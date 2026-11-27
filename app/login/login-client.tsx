@@ -24,9 +24,15 @@ export type LoginBrand = {
   logoUrl: string | null;
   // Whether to show the "A CIRIS Studio product" footer tag.
   poweredByCiris: boolean;
+  // Org slug — lets us swap non-brand chrome (e.g. the WebGL shader
+  // feels wrong for Studio 360; we pick a brand-appropriate panel).
+  slug: string | null;
+  // Brand accent hex (e.g. "#FFB500") for small deco touches.
+  accent: string | null;
 };
 
 export default function LoginClient({ brand }: { brand: LoginBrand }) {
+  const isStudio360 = brand.slug === "studio-360";
   const router = useRouter();
   const params = useSearchParams();
   const next = params?.get("next") ?? "/";
@@ -97,17 +103,43 @@ export default function LoginClient({ brand }: { brand: LoginBrand }) {
 
   return (
     <main className="min-h-screen grid lg:grid-cols-2">
-      {/* Left: brand panel — shadergradient background, logo + REVIEW pair
-          centered vertically with horizontal divider. Mobile collapses. */}
+      {/* Left: brand panel.
+          Default (CIRIS): shadergradient background + ink wash.
+          Studio 360: flat black with a single large yellow arc + a
+          corner motif echoing their brandbook — the shader is an
+          off-brand aesthetic for them and gets replaced. */}
       <aside className="hidden lg:block relative bg-ink text-bg overflow-hidden">
-        <div aria-hidden className="absolute inset-0">
-          <LoginShader />
-        </div>
-        <div aria-hidden className="absolute inset-0 bg-black/35 pointer-events-none" />
-        <div
-          aria-hidden
-          className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/40 pointer-events-none"
-        />
+        {isStudio360 ? (
+          <>
+            {/* Oversized yellow glow lower-right — echoes the 360° arc
+                without reproducing their pattern verbatim. */}
+            <div
+              aria-hidden
+              className="absolute -right-40 -bottom-40 h-[640px] w-[640px] rounded-full pointer-events-none"
+              style={{
+                background: `radial-gradient(circle at center, ${brand.accent ?? "#FFB500"} 0%, transparent 65%)`,
+                opacity: 0.35,
+              }}
+            />
+            {/* Corner mark — tiny yellow dot top-right, their arc motif. */}
+            <div
+              aria-hidden
+              className="absolute top-10 right-10 h-3 w-3 rounded-full"
+              style={{ background: brand.accent ?? "#FFB500" }}
+            />
+          </>
+        ) : (
+          <>
+            <div aria-hidden className="absolute inset-0">
+              <LoginShader />
+            </div>
+            <div aria-hidden className="absolute inset-0 bg-black/35 pointer-events-none" />
+            <div
+              aria-hidden
+              className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/40 pointer-events-none"
+            />
+          </>
+        )}
         <div className="relative h-full flex items-center px-12">
           <div className="flex items-center gap-5 text-bg">
             {brand.logoUrl ? (

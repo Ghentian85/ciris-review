@@ -1,9 +1,22 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { SiteFrame } from "@/components/app/site-frame";
 import { getCurrentUser, isOrgAdmin } from "@/lib/auth";
 import { getCurrentOrg } from "@/lib/org";
 import { brandFaviconSvg } from "@/lib/brand-favicon";
+
+// Inter is the closest free analogue to Studio 360's Neue Haas
+// Grotesque — same neutral grotesk skeleton, generous counters,
+// comparable x-height. We load it site-wide but only *activate* it
+// through the `[data-brand="studio-360"]` selector so chapter103
+// keeps its existing serif/system stack untouched.
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-grotesque",
+  display: "swap",
+});
 
 // Metadata (title, description, favicon, open-graph) is resolved per
 // tenant from the request hostname. Studio 360 visitors see "Studio 360
@@ -57,8 +70,8 @@ export default async function RootLayout({
     : undefined;
 
   return (
-    <html lang="en">
-      <body style={brandAccentStyle}>
+    <html lang="en" className={inter.variable}>
+      <body style={brandAccentStyle} data-brand={org?.slug ?? undefined}>
         <SiteFrame
           user={user ? { email: user.email } : null}
           isAdmin={isAdmin}
