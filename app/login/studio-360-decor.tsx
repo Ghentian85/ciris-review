@@ -2,33 +2,42 @@
 
 import { Logo } from "@/components/app/logo";
 
-// Hover-animated CIRIS wordmark for the panel's lower-left footer.
-// On hover: the "Powered by" caption fades to full opacity and the
-// wordmark eases from muted to pure white. No glow, no sheen — a
-// single quiet opacity transition that reads as premium rather than
-// product-launch energy.
+// "Powered by CIRIS" footer lockup. Mirrors the topbar's pattern:
+//   [primary mark] · | · [caption]
+// but inverted — here CIRIS is the trailing mark and "Powered by" is
+// the lead-in caption, divided by a hairline. Cap-heights are matched
+// visually (CIRIS trimmed to ~12px, Powered by at 10px) so neither
+// element dwarfs the other.
 //
-// The `accent` prop is intentionally unused for now but kept in the
-// signature so we can add a tasteful accent flourish (a tick-bar
-// underneath, a dot) later without touching call-sites.
+// Hover: both halves lift from 55% to full white, caption gets a hint
+// of tracking, wordmark eases scale(1.02). No glow — the composition
+// carries the branding on its own.
+//
+// `accent` kept in the signature for later use (small accent dot or
+// underline trick) without touching call-sites.
 export function PoweredByCirisMark({}: { accent: string }) {
   return (
     <a
       href="https://ciris.studio"
       target="_blank"
       rel="noopener"
-      className="group absolute bottom-8 left-12 inline-flex items-baseline gap-2.5 text-bg/55 hover:text-bg/95"
+      className="group absolute bottom-8 left-12 inline-flex items-center gap-3 text-bg/55 hover:text-bg/95"
       aria-label="Powered by CIRIS — visit ciris.studio"
       style={{ transition: "color 500ms ease" }}
     >
-      <span className="text-[10px] tracking-[0.24em] uppercase font-medium translate-y-[1px] transition-opacity duration-500 opacity-70 group-hover:opacity-100">
+      <span className="text-[10px] tracking-[0.22em] uppercase font-medium transition-[letter-spacing,opacity] duration-500 opacity-70 group-hover:opacity-100 group-hover:tracking-[0.24em]">
         Powered by
       </span>
-      {/* trim=true crops the SVG viewBox to the actual glyph block so
-          baseline alignment works naturally against the caption. */}
+      {/* Hairline divider — same role as the topbar's border between
+          the brand mark and the REVIEW label. Height is pinned so it
+          doesn't scale with font changes. */}
+      <span
+        aria-hidden
+        className="h-3 w-px bg-current opacity-30"
+      />
       <Logo
         trim
-        className="h-[18px] w-auto fill-current transition-transform duration-500 ease-out group-hover:scale-[1.02]"
+        className="h-3 w-auto fill-current transition-transform duration-500 ease-out group-hover:scale-[1.03]"
       />
     </a>
   );
