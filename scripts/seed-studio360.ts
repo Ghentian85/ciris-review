@@ -40,7 +40,8 @@ async function main() {
   });
   console.log(`✓ ${chapter.name} (slug=${chapter.slug}) → hostname=${chapter.hostname}`);
 
-  // 2. Create Studio 360 org
+  // 2. Create Studio 360 org. Logo + accent come from their brandbook:
+  // light wordmark (fits our dark topbar) and Pantone 7549 C yellow.
   const studio = await prisma.organization.upsert({
     where: { slug: "studio-360" },
     create: {
@@ -48,16 +49,16 @@ async function main() {
       slug: "studio-360",
       hostname: "studio360.ciris.studio",
       displayName: "Studio 360",
-      // logoUrl empty for now — Sam uploads the SVG into /public/orgs/
-      // and we point this at `/orgs/studio-360.svg` after.
-      logoUrl: null,
-      brandAccent: null, // defaults to coral
+      logoUrl: "/orgs/studio-360-wordmark.svg",
+      brandAccent: "#FFB500",
       poweredByCiris: true,
       studioMode: true,
     },
     update: {
       hostname: "studio360.ciris.studio",
       displayName: "Studio 360",
+      logoUrl: "/orgs/studio-360-wordmark.svg",
+      brandAccent: "#FFB500",
       poweredByCiris: true,
       studioMode: true,
     },
