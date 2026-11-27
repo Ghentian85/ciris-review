@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { mintSignInUrl } from "@/lib/auth";
 import { sendEmail, passwordResetEmail } from "@/lib/email";
-import { env } from "@/lib/env";
+import { getRequestBaseUrl } from "@/lib/request-url";
 
 const schema = z.object({
   email: z.string().email(),
@@ -27,7 +27,9 @@ export async function POST(req: NextRequest) {
   }
 
   const url = await mintSignInUrl({
-    baseUrl: env.APP_URL,
+    // Same per-tenant hostname logic as /login — reset links must land
+    // back on the subdomain the user is actually trying to access.
+    baseUrl: getRequestBaseUrl(req),
     email,
     nextPath: "/account/reset",
   });

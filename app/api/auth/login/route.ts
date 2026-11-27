@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createLoginToken } from "@/lib/auth";
 import { sendEmail, magicLinkEmail } from "@/lib/email";
-import { env } from "@/lib/env";
+import { getRequestBaseUrl } from "@/lib/request-url";
 
 const schema = z.object({
   email: z.string().email(),
@@ -21,7 +21,11 @@ export async function POST(req: NextRequest) {
   }
   const { user, raw } = await createLoginToken(parsed.data.email, parsed.data.name);
 
-  const verifyUrl = new URL("/api/auth/verify", env.APP_URL);
+  // Mint the magic link against THIS tenant's hostname — not a global
+  // env.APP_URL — so the verify callback lands back on studio360.ciris.
+  // studio (or any future whitelabel host) and the session cookie is
+  // set on the right origin.
+  const verifyUrl = new URL("/api/auth/verify", getRequestBaseUrl(req));
   verifyUrl.searchParams.set("token", raw);
   if (parsed.data.next) verifyUrl.searchParams.set("next", parsed.data.next);
   const url = verifyUrl.toString();
