@@ -2,44 +2,34 @@
 
 import { Logo } from "@/components/app/logo";
 
-
 // Hover-animated CIRIS wordmark for the panel's lower-left footer.
-// On hover: label fades up, wordmark eases from muted to full white
-// and a soft accent glow blooms underneath. No sliding sheen — quiet
-// and premium, matches Studio 360's reduced vocabulary.
-export function PoweredByCirisMark({ accent }: { accent: string }) {
-  // Build the accent as an rgba-ish drop-shadow so we can colour the
-  // glow directly from the brand accent without hardcoding yellow.
+// On hover: the "Powered by" caption fades to full opacity and the
+// wordmark eases from muted to pure white. No glow, no sheen — a
+// single quiet opacity transition that reads as premium rather than
+// product-launch energy.
+//
+// The `accent` prop is intentionally unused for now but kept in the
+// signature so we can add a tasteful accent flourish (a tick-bar
+// underneath, a dot) later without touching call-sites.
+export function PoweredByCirisMark({}: { accent: string }) {
   return (
     <a
       href="https://ciris.studio"
       target="_blank"
       rel="noopener"
-      className="ciris-mark group absolute bottom-8 left-12 inline-flex items-baseline gap-2 text-bg/55 hover:text-bg/95"
+      className="group absolute bottom-8 left-12 inline-flex items-baseline gap-2.5 text-bg/55 hover:text-bg/95"
       aria-label="Powered by CIRIS — visit ciris.studio"
-      style={
-        {
-          transition: "color 500ms ease",
-          // Scoped CSS variable the <style> block below reads off —
-          // lets the drop-shadow bloom follow whatever the tenant
-          // picked as accent without hardcoding yellow.
-          ["--brand-glow" as string]: accent,
-        } as React.CSSProperties
-      }
+      style={{ transition: "color 500ms ease" }}
     >
       <span className="text-[10px] tracking-[0.24em] uppercase font-medium translate-y-[1px] transition-opacity duration-500 opacity-70 group-hover:opacity-100">
         Powered by
       </span>
-      <Logo className="h-7 w-auto fill-current transition-transform duration-500 ease-out group-hover:scale-[1.02]" />
-      <style>{`
-        .ciris-mark svg {
-          transition: filter 500ms ease;
-        }
-        .ciris-mark:hover svg {
-          filter: drop-shadow(0 0 14px var(--brand-glow))
-                  drop-shadow(0 0 3px var(--brand-glow));
-        }
-      `}</style>
+      {/* trim=true crops the SVG viewBox to the actual glyph block so
+          baseline alignment works naturally against the caption. */}
+      <Logo
+        trim
+        className="h-[18px] w-auto fill-current transition-transform duration-500 ease-out group-hover:scale-[1.02]"
+      />
     </a>
   );
 }

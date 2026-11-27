@@ -3,18 +3,30 @@ import { cn } from "@/lib/utils";
 // Inline CIRIS wordmark. Inline (not <img>) so currentColor on the parent
 // drives the fill — letting the topbar choose white-on-dark, ink-on-light,
 // etc. without baking the color into the SVG file.
+//
+// trim: when true, uses a viewBox cropped tight around the actual glyphs
+// (no top/bottom whitespace). Use this anywhere you need the letters to
+// baseline-align with surrounding text — e.g. the "Powered by CIRIS"
+// lockup. The default (false) keeps the original padded viewBox used by
+// the topbar and the sign-in panel.
 export function Logo({
   className,
   title = "CIRIS",
+  trim = false,
 }: {
   className?: string;
   title?: string;
+  trim?: boolean;
 }) {
+  // Original viewBox has ~27% empty space below the glyphs (letter
+  // baseline sits at y≈92 of 127.5). The trimmed box clips to the
+  // actual letter block (y 34 → 92) so SVG baseline === glyph baseline.
+  const viewBox = trim ? "42 34 206 58" : "0 0 288 127.526";
   return (
     <svg
       role="img"
       aria-label={title}
-      viewBox="0 0 288 127.526"
+      viewBox={viewBox}
       className={cn("h-9 w-auto fill-current", className)}
       xmlns="http://www.w3.org/2000/svg"
     >
